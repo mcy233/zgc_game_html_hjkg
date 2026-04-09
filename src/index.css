@@ -1,0 +1,101 @@
+@import "tailwindcss";
+
+/* 避免 iOS 横竖屏自动放大字号 */
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  min-height: 100svh;
+}
+
+#root {
+  min-height: 100dvh;
+  min-height: 100svh;
+}
+
+/* 刘海屏 / 底部手势条 */
+.app-safe-x {
+  padding-left: max(0.75rem, env(safe-area-inset-left, 0px));
+  padding-right: max(0.75rem, env(safe-area-inset-right, 0px));
+}
+
+.app-safe-b {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+}
+
+.app-safe-t {
+  padding-top: max(0.5rem, env(safe-area-inset-top, 0px));
+}
+
+/* 游戏画布：随容器宽度缩放，保持 800×600 比例（逻辑分辨率不变） */
+.game-stage-shell {
+  position: relative;
+  width: 100%;
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.game-canvas {
+  display: block;
+  width: 100%;
+  max-width: 800px;
+  height: auto;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+/* 竖屏且可视高度紧张：限制画布高度，避免 HUD + 画布超出屏幕 */
+@media (orientation: portrait) and (max-height: 700px) {
+  .game-canvas {
+    max-height: min(52dvh, 420px);
+    width: auto;
+    max-width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+/* 横屏手机 / 矮视口：以高度为约束缩放画布 */
+@media (orientation: landscape) and (max-height: 520px) {
+  .game-canvas {
+    max-height: min(calc(100dvh - 72px), calc(100dvw * 0.58));
+    width: auto;
+    max-width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+/* 横屏极矮：再压缩画布显示高度 */
+@media (orientation: landscape) and (max-height: 400px) {
+  .game-canvas {
+    max-height: min(calc(100dvh - 56px), 320px);
+  }
+}
+
+/* 补给站：仿原版木质柜台背景 */
+.shop-wood-bg {
+  background-color: #3d2914;
+  background-image:
+    repeating-linear-gradient(
+      88deg,
+      transparent,
+      transparent 3px,
+      rgba(0, 0, 0, 0.12) 3px,
+      rgba(0, 0, 0, 0.12) 5px
+    ),
+    linear-gradient(180deg, #5c3d1e 0%, #3d2914 45%, #2d1f0e 100%);
+}
+
+.shop-title-gold {
+  color: #fde047;
+  text-shadow:
+    0 1px 0 #854d0e,
+    0 2px 0 #713f12,
+    0 3px 4px rgba(0, 0, 0, 0.45);
+}
