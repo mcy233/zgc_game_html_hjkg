@@ -1100,58 +1100,79 @@ function ShopScreen({
       animate={{ opacity: 1 }}
       className="absolute inset-0 z-50 shop-wood-bg flex flex-col overflow-hidden text-amber-50"
     >
-      <div className="relative z-10 flex shrink-0 items-start justify-between gap-3 border-b-2 border-amber-950/50 px-4 pb-3 pt-4 sm:px-6 sm:pt-5">
-        <h2 className="shop-title-gold text-2xl font-black tracking-tight sm:text-4xl">学院补给站</h2>
+      <div className="relative z-10 flex shrink-0 items-center gap-2 border-b-2 border-amber-950/50 px-3 pb-3 pt-3 sm:gap-4 sm:px-6 sm:pb-3 sm:pt-5">
+        <h2 className="shop-title-gold shrink-0 text-xl font-black tracking-tight sm:text-3xl lg:text-4xl">学院补给站</h2>
+        <div className="min-w-0 flex-1 flex justify-center px-1">
+          <div className="text-center leading-tight">
+            <div className="text-[9px] font-black text-amber-200/90 sm:text-xs">当前培养积分</div>
+            <div className="text-sm font-black tabular-nums text-lime-300 sm:text-lg lg:text-xl">${gameState.score}</div>
+          </div>
+        </div>
         <button
           type="button"
           onClick={onNextLevel}
-          className="shrink-0 rounded-xl border-2 border-lime-800 bg-lime-500 px-4 py-2 text-sm font-black text-lime-950 shadow-md transition-transform hover:bg-lime-400 active:scale-95 sm:px-5 sm:py-2.5 sm:text-base"
+          className="shrink-0 rounded-xl border-2 border-lime-800 bg-lime-500 px-3 py-1.5 text-xs font-black text-lime-950 shadow-md transition-transform hover:bg-lime-400 active:scale-95 sm:px-5 sm:py-2.5 sm:text-base"
         >
           下一关
         </button>
       </div>
 
-      <div className="relative z-10 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain px-4 py-3 sm:flex-row sm:gap-4 sm:px-6 sm:py-4">
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <p className="mb-3 text-center text-sm leading-relaxed text-amber-100/95 sm:text-left sm:text-base">
-            先点击货架<strong className="text-amber-200">选中</strong>物资，在下方查看说明后点<strong className="text-amber-200">「购买」</strong>。价签每轮随机。买完点右上角<strong className="text-amber-200">「下一关」</strong>继续。
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col gap-3 overflow-hidden px-4 py-3 sm:flex-row sm:items-stretch sm:gap-4 sm:px-6 sm:py-4">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col sm:overflow-hidden">
+          <p className="mb-3 shrink-0 text-center text-sm leading-relaxed text-amber-100/95 sm:text-left sm:text-base">
+            先点击货架<strong className="text-amber-200">选中</strong>物资，在<strong className="text-amber-200">右侧说明区</strong>查看介绍后点<strong className="text-amber-200">「购买」</strong>。价签每轮随机。买完点右上角<strong className="text-amber-200">「下一关」</strong>继续。
           </p>
 
-          <div className="grid w-full max-w-3xl grid-cols-2 gap-2 px-2 py-3 sm:mx-auto sm:grid-cols-3 md:grid-cols-4 sm:gap-3 sm:px-3 sm:py-4 rounded-2xl border-4 border-amber-900/80 bg-gradient-to-b from-amber-800/35 to-amber-950/50 justify-items-stretch">
-            {gameState.availableShopOffers.map((offer) => {
-              const def = SHOP_ENTRY_DEFS.find((d) => d.type === offer.type);
-              if (!def) return null;
-              const itemPurchased = gameState.purchasedItems.includes(offer.type);
-              return (
-                <div key={offer.type} className="flex min-h-0 min-w-0 h-full w-full">
-                  <ShopShelfTileCompact
-                    icon={shopRowIcon(offer.type, 'w-6 h-6 sm:w-7 sm:h-7')}
-                    title={def.title}
-                    price={offer.price}
-                    selected={shopSelectedType === offer.type}
-                    purchased={itemPurchased}
-                    onSelect={() => onSelectOffer(offer.type)}
-                    color={def.color}
-                  />
-                </div>
-              );
-            })}
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border-4 border-amber-900/80 bg-gradient-to-b from-amber-800/35 to-amber-950/50 sm:mx-auto sm:max-w-3xl sm:w-full">
+            <div className="grid min-h-0 flex-1 grid-cols-2 gap-2 overflow-y-auto overscroll-contain px-2 py-3 [grid-auto-rows:min-content] content-start sm:grid-cols-3 md:grid-cols-4 sm:gap-3 sm:px-3 sm:py-4">
+              {gameState.availableShopOffers.map((offer) => {
+                const def = SHOP_ENTRY_DEFS.find((d) => d.type === offer.type);
+                if (!def) return null;
+                const itemPurchased = gameState.purchasedItems.includes(offer.type);
+                return (
+                  <div key={offer.type} className="flex min-h-0 min-w-0 h-full w-full">
+                    <ShopShelfTileCompact
+                      icon={shopRowIcon(offer.type, 'w-6 h-6 sm:w-7 sm:h-7')}
+                      title={def.title}
+                      price={offer.price}
+                      selected={shopSelectedType === offer.type}
+                      purchased={itemPurchased}
+                      onSelect={() => onSelectOffer(offer.type)}
+                      color={def.color}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex w-full min-h-0 min-w-0 shrink-0 flex-col gap-2 sm:w-[13.5rem] lg:w-[15rem]">
+          <div className="flex shrink-0 flex-row items-start justify-center gap-2 sm:flex-col sm:items-center">
+            <span className="text-4xl drop-shadow-lg sm:text-5xl lg:text-6xl" role="img" aria-hidden>
+              👨‍🏫
+            </span>
+            <div className="relative min-w-0 flex-1 rounded-2xl border-2 border-amber-200/40 bg-amber-50 px-2.5 py-2 text-left text-xs font-bold leading-snug text-amber-950 shadow-lg sm:mt-1 sm:w-full sm:px-3 sm:py-2.5 sm:text-sm lg:text-base">
+              <div className="absolute -left-1.5 top-3 hidden h-3 w-3 rotate-45 border-b-2 border-l-2 border-amber-200/40 bg-amber-50 sm:block" />
+              同学好！先看说明再点购买，别手滑～
+            </div>
           </div>
 
-          <div className="mt-3 shrink-0 rounded-2xl border-4 border-amber-900/85 bg-gradient-to-b from-amber-950/55 to-amber-950/90 px-4 py-4 shadow-inner sm:px-5 sm:py-5">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border-4 border-amber-900/85 bg-gradient-to-b from-amber-950/55 to-amber-950/90 shadow-inner">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 sm:px-4 sm:py-4">
             {selectedDef && selectedOffer ? (
               <>
-                <h3 className="text-lg font-black leading-snug text-amber-50 sm:text-xl">{selectedDef.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-amber-100/95 sm:text-base">{selectedDef.desc}</p>
-                <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="text-base font-black tabular-nums text-lime-300 sm:text-lg">
+                <h3 className="text-base font-black leading-snug text-amber-50 sm:text-lg lg:text-xl">{selectedDef.title}</h3>
+                <p className="mt-1.5 text-xs leading-relaxed text-amber-100/95 sm:mt-2 sm:text-sm lg:text-base">{selectedDef.desc}</p>
+                <div className="mt-3 flex flex-col gap-2">
+                  <div className="text-sm font-black tabular-nums text-lime-300 sm:text-base lg:text-lg">
                     标价 <span className="text-lime-200">${selectedOffer.price}</span>
                   </div>
                   <button
                     type="button"
                     onClick={() => onBuy(shopSelectedType!)}
                     disabled={!canBuy}
-                    className={`w-full rounded-xl border-2 px-4 py-3 text-base font-black shadow-lg transition-transform sm:w-auto sm:min-w-[10rem] sm:px-6 sm:text-lg ${
+                    className={`w-full rounded-xl border-2 px-3 py-2.5 text-sm font-black shadow-lg transition-transform sm:px-4 sm:py-3 sm:text-base lg:text-lg ${
                       purchased
                         ? 'cursor-not-allowed border-stone-600 bg-stone-700/80 text-stone-300'
                         : canBuy
@@ -1164,22 +1185,9 @@ function ShopScreen({
                 </div>
               </>
             ) : (
-              <p className="text-center text-base text-amber-200/80 sm:text-lg">请先在上方选择一件物资。</p>
+              <p className="text-center text-sm text-amber-200/80 sm:text-base">请先在左侧选择一件物资。</p>
             )}
-          </div>
-
-          <div className="mt-4 mb-2 text-center text-base font-bold text-amber-200 sm:text-lg">
-            当前培养积分：<span className="tabular-nums text-lime-300">${gameState.score}</span>
-          </div>
-        </div>
-
-        <div className="hidden shrink-0 flex-col items-center sm:flex sm:w-48 lg:w-52">
-          <span className="text-5xl drop-shadow-lg sm:text-6xl" role="img" aria-hidden>
-            👨‍🏫
-          </span>
-          <div className="relative mt-3 rounded-2xl border-2 border-amber-200/40 bg-amber-50 px-3 py-2.5 text-left text-sm font-bold leading-snug text-amber-950 shadow-lg sm:text-base">
-            <div className="absolute -left-1.5 top-4 h-3 w-3 rotate-45 border-b-2 border-l-2 border-amber-200/40 bg-amber-50" />
-            同学好！先看说明再点购买，别手滑～
+            </div>
           </div>
         </div>
       </div>
