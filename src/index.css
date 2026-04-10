@@ -5,27 +5,31 @@ html {
   -webkit-text-size-adjust: 100%;
 }
 
-body {
+/*
+ * 所有设备统一锁定视口高度，禁止滚动。
+ * 游戏始终在一屏内完整显示——无论 4:3、16:9 还是 21:9。
+ */
+html,
+body,
+#root {
+  height: 100svh;
+  max-height: 100svh;
+  overflow: hidden;
+  overscroll-behavior: none;
   margin: 0;
-  min-height: 100dvh;
-  min-height: 100svh;
 }
 
 #root {
-  min-height: 100dvh;
-  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
 }
 
-/* 手机：整页不滚动，由游戏区自适应缩放填满可视区域 */
-@media (max-width: 767px) {
-  html,
-  body,
-  #root {
-    height: 100dvh;
-    max-height: 100dvh;
-    overflow: hidden;
-    overscroll-behavior: none;
-  }
+.app-shell-fill {
+  flex: 1 1 0;
+  min-height: 0;
+  width: 100%;
+  max-height: 100%;
+  overflow: hidden;
 }
 
 /* 刘海屏 / 底部手势条 */
@@ -35,16 +39,16 @@ body {
 }
 
 .app-safe-b {
-  padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
 }
 
 .app-safe-t {
-  padding-top: max(0.5rem, env(safe-area-inset-top, 0px));
+  padding-top: max(0.25rem, env(safe-area-inset-top, 0px));
 }
 
-/**
- * 游戏可视区：移动端用容器查询尺寸 (cqw/cqh)，在宽、高中取较小缩放因子，
- * 使 800×600 舞台完整落入视口（不再依赖整页滚动）。
+/*
+ * game-viewport 始终用 container-type: size，
+ * 使 game-stage-shell 拿到真实可用宽高做容器查询缩放。
  */
 .game-viewport {
   flex: 1 1 0;
@@ -58,16 +62,10 @@ body {
   container-name: game;
 }
 
-/* 桌面：无固定容器高度时关闭 size 容器，避免 cqh 为 0 */
-@media (min-width: 768px) {
-  .game-viewport {
-    flex: none;
-    container-type: normal;
-    min-height: unset;
-  }
-}
-
-/* 游戏外框：逻辑 800×600，显示尺寸随容器伸缩 */
+/*
+ * 游戏舞台壳：逻辑 800×600（4:3）。
+ * 通过容器查询取 min(可用宽, 可用高×4/3) 确保完整落入视口。
+ */
 .game-stage-shell {
   position: relative;
   box-sizing: border-box;
@@ -75,52 +73,29 @@ body {
   margin-right: auto;
   aspect-ratio: 800 / 600;
   max-width: 800px;
+  container-type: inline-size;
+  container-name: stage;
 }
 
-/* 移动端：无容器单位时的回退（略保守的 chrome 预留） */
-@media (max-width: 767px) {
+@supports (width: 1cqw) {
   .game-stage-shell {
-    max-width: min(800px, 100%);
-    aspect-ratio: 800 / 600;
-    height: auto;
-    max-height: calc(100dvh - 4.5rem);
+    width: min(100cqw, calc(100cqh * 800 / 600), 800px);
+    max-height: 100cqh;
+  }
+}
+
+/* 兜底：没有容器查询能力时用 svh 估算 */
+@supports not (width: 1cqw) {
+  .game-stage-shell {
+    --game-chrome-v: calc(
+      3.5rem + env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px)
+    );
+    max-height: calc(100svh - var(--game-chrome-v));
     width: min(
       calc(100vw - 12px),
-      calc((100dvh - 4.5rem) * 800 / 600),
-      100%
+      calc((100svh - var(--game-chrome-v)) * 800 / 600),
+      800px
     );
-  }
-}
-
-@media (max-width: 767px) and (orientation: landscape) {
-  .game-stage-shell {
-    max-height: calc(100dvh - 1.5rem);
-    width: min(calc(100vw - 12px), calc((100dvh - 1.5rem) * 800 / 600), 100%);
-  }
-}
-
-/* 支持容器查询时：以 game-viewport 实际剩余区域为准（含竖屏提示条高度） */
-@supports (width: 1cqw) {
-  @media (max-width: 767px) {
-    .game-stage-shell {
-      width: min(100cqw, calc(100cqh * 800 / 600));
-      max-width: min(800px, 100%);
-      max-height: 100cqh;
-    }
-  }
-
-  @media (max-width: 767px) and (orientation: landscape) {
-    .game-stage-shell {
-      width: min(100cqw, calc(100cqh * 800 / 600));
-      max-height: 100cqh;
-    }
-  }
-}
-
-@media (min-width: 768px) {
-  .game-stage-shell {
-    width: 100%;
-    max-height: none;
   }
 }
 
@@ -133,7 +108,7 @@ body {
   user-select: none;
 }
 
-/* 竖屏小屏提示：不占太多高度 */
+/* 竖屏小屏提示条 */
 .portrait-hint-bar {
   display: none;
 }
