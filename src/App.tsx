@@ -540,9 +540,10 @@ export default function App() {
       ctx.beginPath(); ctx.moveTo(0, 100 + i * 100); ctx.lineTo(CANVAS_WIDTH, 150 + i * 80); ctx.stroke();
     }
 
-    // Miner Area
-    ctx.fillStyle = '#0f172a'; ctx.fillRect(0, 0, CANVAS_WIDTH, 100);
-    ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, 100); ctx.lineTo(CANVAS_WIDTH, 100); ctx.stroke();
+    // Miner Area（高度随 MINER_Y 留出站台，避免小人贴紧与矿区交界线）
+    const minerPlatformBottom = Math.max(108, MINER_Y + 20);
+    ctx.fillStyle = '#0f172a'; ctx.fillRect(0, 0, CANVAS_WIDTH, minerPlatformBottom);
+    ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, minerPlatformBottom); ctx.lineTo(CANVAS_WIDTH, minerPlatformBottom); ctx.stroke();
 
       // Items
       items.forEach(item => {
@@ -652,14 +653,19 @@ export default function App() {
     }
     ctx.restore();
 
-    // 碎碎念气泡：画在博士上方、水平以 MINER_X 为中心，尾巴朝下指向头部，不挡钩子
+    // 碎碎念气泡：放在博士左侧，矩形与尾巴均不进入小人包围盒（与小人互不遮挡）
     if (mumbleBubble) {
       const margin = 8;
-      const maxTextW = 148;
-      const padding = 10;
+      /** 收窄宽度多换行，避免伸进左侧黄色 HUD 下被挡（画布坐标下约 1/4 宽为 HUD） */
+      const maxTextW = 88;
+      const padding = 8;
       const lineH = 16;
-      const tailGap = 10;
       const fontBubble = 'bold 12px sans-serif';
+      /** 小人占用宽度的一半 + 留白，气泡右缘须在此线左侧 */
+      const minerHalfW = 44;
+      const bubbleToMinerGap = 14;
+      const leftHudReserve = 216;
+
       ctx.save();
       ctx.font = fontBubble;
       const lines: string[] = [];
@@ -679,12 +685,16 @@ export default function App() {
       const bw = maxTextW + padding * 2;
       const bh = Math.max(34, lines.length * lineH + padding * 2);
       const br = 10;
-      const chinY = MINER_Y - 8;
-
-      let bx = MINER_X - bw / 2;
-      bx = Math.max(margin, Math.min(bx, CANVAS_WIDTH - bw - margin));
-      let by = chinY - tailGap - bh;
+      const bubbleRightMax = MINER_X - minerHalfW - bubbleToMinerGap;
+      let bx = bubbleRightMax - bw;
+      bx = Math.max(leftHudReserve, bx);
+      bx = Math.max(margin, bx);
+      if (bx + bw > bubbleRightMax) bx = bubbleRightMax - bw;
+      bx = Math.max(leftHudReserve, bx);
+      const anchorY = MINER_Y - 26;
+      let by = anchorY - bh / 2;
       if (by < margin) by = margin;
+      if (by + bh > MINER_Y + 28) by = MINER_Y + 28 - bh;
 
       ctx.fillStyle = 'rgba(255,255,255,0.96)';
       ctx.strokeStyle = 'rgba(15,23,42,0.92)';
@@ -694,12 +704,14 @@ export default function App() {
       ctx.fill();
       ctx.stroke();
 
-      const tipX = Math.max(bx + 14, Math.min(MINER_X, bx + bw - 14));
-      const bubbleBottom = by + bh;
+      const midY = by + bh / 2;
+      const bubbleRight = bx + bw;
+      const tailTipX = MINER_X - 24;
+      const tailTipY = MINER_Y - 22;
       ctx.beginPath();
-      ctx.moveTo(tipX, chinY);
-      ctx.lineTo(tipX - 7, bubbleBottom);
-      ctx.lineTo(tipX + 7, bubbleBottom);
+      ctx.moveTo(bubbleRight, midY - 9);
+      ctx.lineTo(tailTipX, tailTipY);
+      ctx.lineTo(bubbleRight, midY + 9);
       ctx.closePath();
       ctx.fillStyle = 'rgba(255,255,255,0.96)';
       ctx.fill();
@@ -715,7 +727,7 @@ export default function App() {
       ctx.restore();
     }
 
-    // Miner Character（始终在气泡之上绘制，位置固定，不受碎碎念影响）
+    // Miner Character（画在气泡之后，绳子已从锚点连出）
     ctx.save();
     ctx.translate(MINER_X, MINER_Y - 20);
     ctx.fillStyle = '#1e293b';
@@ -764,9 +776,16 @@ export default function App() {
   const shredderDim = gameState.status !== 'PLAYING' || gameState.hasShredder <= 0;
 
   return (
-    <div className="min-h-[100dvh] min-h-[100svh] bg-slate-950 text-slate-100 font-sans flex flex-col items-center justify-start sm:justify-center app-safe-x app-safe-b app-safe-t py-2 sm:py-4 px-2 sm:px-4 gap-2 sm:gap-4 box-border">
-      <div className="w-full max-w-[800px] min-w-0 flex justify-center">
-        <div className="game-stage-outer relative game-stage-shell border-4 sm:border-[10px] lg:border-[12px] border-slate-800/80 rounded-2xl sm:rounded-[2rem] lg:rounded-[3rem] overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.6)] bg-slate-950 group shrink-0 w-full">
+    <div className="box-border flex flex-col items-center bg-slate-950 font-sans text-slate-100 max-md:h-[100dvh] max-md:max-h-[100dvh] max-md:overflow-hidden max-md:gap-0 max-md:py-0 md:min-h-[100dvh] md:min-h-[100svh] md:justify-center md:gap-4 md:py-4 md:overflow-visible app-safe-x app-safe-b app-safe-t px-2 sm:px-4">
+      <div
+        className="portrait-hint-bar shrink-0 items-center justify-center gap-1.5 border-b border-slate-800/80 bg-slate-900/95 px-2 py-1 text-center text-[10px] font-bold leading-tight text-amber-200/90"
+        role="status"
+      >
+        <span aria-hidden>↻</span>
+        横屏可显示更大画面；竖屏已自动缩放至一屏内，无需拖动页面。
+      </div>
+      <div className="game-viewport">
+        <div className="game-stage-outer group relative shrink-0 overflow-hidden rounded-2xl border-4 border-slate-800/80 bg-slate-950 shadow-[0_0_80px_rgba(0,0,0,0.6)] sm:rounded-[2rem] sm:border-[10px] lg:rounded-[3rem] lg:border-[12px] game-stage-shell">
         <canvas
           ref={canvasRef}
           width={CANVAS_WIDTH}
@@ -779,7 +798,7 @@ export default function App() {
         />
 
         {showMinerHud && (
-          <div className="pointer-events-none absolute top-0 left-0 right-0 z-[11] flex h-[min(16.667%,104px)] min-h-[56px] max-h-[104px]">
+          <div className="pointer-events-none absolute top-0 left-0 right-0 z-[11] flex h-[min(18%,118px)] min-h-[60px] max-h-[118px]">
             <div className="pointer-events-auto flex h-full w-1/4 max-w-[220px] min-w-[96px] shrink-0 flex-col justify-center border-b-4 border-amber-800 bg-gradient-to-b from-amber-300 to-amber-400 px-1.5 py-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.35)] sm:px-2.5 sm:py-1.5">
               <div className="text-[8px] sm:text-[10px] font-black text-amber-950/90 leading-tight">培养积分</div>
               <div className="text-sm sm:text-lg font-black leading-none text-green-700 tabular-nums drop-shadow-sm">${gameState.score}</div>
@@ -812,7 +831,7 @@ export default function App() {
         {gameState.status === 'PLAYING' && (
           <button
             type="button"
-            className={`pointer-events-auto absolute left-[calc(50%+3.25rem)] top-[calc(min(16.667%,104px)/2)] z-[16] flex -translate-y-1/2 flex-col items-center justify-center gap-0.5 rounded-xl border-2 px-2 py-1.5 shadow-lg backdrop-blur-sm transition-transform active:scale-95 min-w-[3.75rem] sm:left-[calc(50%+3.75rem)] sm:rounded-2xl sm:px-2.5 sm:py-2 sm:min-w-[4rem] ${
+            className={`pointer-events-auto absolute left-[calc(50%+3.25rem)] top-[max(0.5rem,calc(min(18%,118px)*0.38))] z-[16] flex -translate-y-1/2 flex-col items-center justify-center gap-0.5 rounded-xl border-2 px-2 py-1.5 shadow-lg backdrop-blur-sm transition-transform active:scale-95 min-w-[3.75rem] sm:left-[calc(50%+3.75rem)] sm:rounded-2xl sm:px-2.5 sm:py-2 sm:min-w-[4rem] ${
               shredderDim
                 ? 'border-slate-600/80 bg-slate-950/85 opacity-55 grayscale'
                 : 'border-red-500/55 bg-red-950/90'
@@ -986,7 +1005,7 @@ export default function App() {
         </div>
       </div>
 
-      <p className="mt-4 sm:mt-6 text-center text-[10px] sm:text-xs text-slate-600 max-w-xl leading-relaxed px-2">
+      <p className="mt-4 hidden max-w-xl px-2 text-center text-xs leading-relaxed text-slate-600 md:block sm:mt-6">
         北京中关村学院 · 人工智能方向拔尖创新人才培养 ·{' '}
         <a href="https://bza.edu.cn/" target="_blank" rel="noopener noreferrer" className="text-sky-500/90 hover:text-sky-400 underline underline-offset-2">学院官网 bza.edu.cn</a>
       </p>

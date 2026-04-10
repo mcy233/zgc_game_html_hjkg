@@ -3,7 +3,8 @@ import type { GameItem, ItemType, ShopItemType, ShopOffer } from './types';
 export const CANVAS_WIDTH = 800;
 export const CANVAS_HEIGHT = 600;
 export const MINER_X = CANVAS_WIDTH / 2;
-export const MINER_Y = 80;
+/** 略低于画布顶，给左侧碎碎念气泡留出垂直空间，避免与小人重叠 */
+export const MINER_Y = 96;
 export const HOOK_RADIUS = 10;
 export const INITIAL_ROPE_LENGTH = 40;
 export const SWING_SPEED = 0.016;
@@ -72,7 +73,7 @@ export const ITEM_CONFIGS: Record<ItemType, { radius: number; value: number; wei
 
 export const LEVELS = [
   {
-    target: 1500,
+    target: 1200,
     time: 42,
     title: '第一学年 · 博一上｜新生进站',
     desc: '你来到北京中关村学院，成为主攻人工智能方向的博士生新生。学院扎根中关村创新核心区，导师组已就位——先在「潜空间」里熟悉数据与实验管线，把先导课的底子打牢。',
@@ -329,11 +330,11 @@ export const MINE_SLOT_POSITIONS: readonly { readonly x: number; readonly y: num
  * 设计原则：前期多小数据、少障碍；中后期增加语料/钻石/雷与「绊脚石」，实习生手捧钻石逐步增多。
  */
 export const LEVEL_SPAWN_PLANS: readonly (readonly LevelSpawnToken[])[] = [
-  // L1 博一上｜新生进站 — 先导课与基础数据为主
+  // L1 博一上｜新生进站 — 先导课与基础数据为主；穿插 1 个语料作高价值目标，顺序绑定槽位以拉开大物体间距
   [
-    'DATA_POINT', 'DATA_POINT', 'DATA_POINT', 'DATA_POINT', 'DATA_POINT', 'DATA_POINT', 'DATA_POINT',
-    'DATA_POINT',
-    'DATASET', 'DATASET', 'DATASET', 'DATASET', 'DATASET',
+    'DATA_POINT', 'DATA_POINT', 'DATA_POINT', 'DATA_POINT',
+    'DATASET', 'DATASET', 'CORPUS', 'DATASET', 'DATASET', 'DATASET',
+    'DATA_POINT', 'DATA_POINT', 'DATA_POINT', 'DATA_POINT',
     'ROCK', 'BAG', 'DIAMOND', 'INTERN',
   ],
   // L2 博一下｜选题 — 标注集、验证集增多

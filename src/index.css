@@ -16,6 +16,18 @@ body {
   min-height: 100svh;
 }
 
+/* 手机：整页不滚动，由游戏区自适应缩放填满可视区域 */
+@media (max-width: 767px) {
+  html,
+  body,
+  #root {
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+}
+
 /* 刘海屏 / 底部手势条 */
 .app-safe-x {
   padding-left: max(0.75rem, env(safe-area-inset-left, 0px));
@@ -30,51 +42,105 @@ body {
   padding-top: max(0.5rem, env(safe-area-inset-top, 0px));
 }
 
-/* 游戏画布：随容器宽度缩放，保持 800×600 比例（逻辑分辨率不变） */
+/**
+ * 游戏可视区：移动端用容器查询尺寸 (cqw/cqh)，在宽、高中取较小缩放因子，
+ * 使 800×600 舞台完整落入视口（不再依赖整页滚动）。
+ */
+.game-viewport {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  container-type: size;
+  container-name: game;
+}
+
+/* 桌面：无固定容器高度时关闭 size 容器，避免 cqh 为 0 */
+@media (min-width: 768px) {
+  .game-viewport {
+    flex: none;
+    container-type: normal;
+    min-height: unset;
+  }
+}
+
+/* 游戏外框：逻辑 800×600，显示尺寸随容器伸缩 */
 .game-stage-shell {
   position: relative;
-  width: 100%;
-  max-width: 800px;
+  box-sizing: border-box;
   margin-left: auto;
   margin-right: auto;
+  aspect-ratio: 800 / 600;
+  max-width: 800px;
+}
+
+/* 移动端：无容器单位时的回退（略保守的 chrome 预留） */
+@media (max-width: 767px) {
+  .game-stage-shell {
+    max-width: min(800px, 100%);
+    aspect-ratio: 800 / 600;
+    height: auto;
+    max-height: calc(100dvh - 4.5rem);
+    width: min(
+      calc(100vw - 12px),
+      calc((100dvh - 4.5rem) * 800 / 600),
+      100%
+    );
+  }
+}
+
+@media (max-width: 767px) and (orientation: landscape) {
+  .game-stage-shell {
+    max-height: calc(100dvh - 1.5rem);
+    width: min(calc(100vw - 12px), calc((100dvh - 1.5rem) * 800 / 600), 100%);
+  }
+}
+
+/* 支持容器查询时：以 game-viewport 实际剩余区域为准（含竖屏提示条高度） */
+@supports (width: 1cqw) {
+  @media (max-width: 767px) {
+    .game-stage-shell {
+      width: min(100cqw, calc(100cqh * 800 / 600));
+      max-width: min(800px, 100%);
+      max-height: 100cqh;
+    }
+  }
+
+  @media (max-width: 767px) and (orientation: landscape) {
+    .game-stage-shell {
+      width: min(100cqw, calc(100cqh * 800 / 600));
+      max-height: 100cqh;
+    }
+  }
+}
+
+@media (min-width: 768px) {
+  .game-stage-shell {
+    width: 100%;
+    max-height: none;
+  }
 }
 
 .game-canvas {
   display: block;
   width: 100%;
-  max-width: 800px;
   height: auto;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
   user-select: none;
 }
 
-/* 竖屏且可视高度紧张：限制画布高度，避免 HUD + 画布超出屏幕 */
-@media (orientation: portrait) and (max-height: 700px) {
-  .game-canvas {
-    max-height: min(52dvh, 420px);
-    width: auto;
-    max-width: 100%;
-    margin-left: auto;
-    margin-right: auto;
-  }
+/* 竖屏小屏提示：不占太多高度 */
+.portrait-hint-bar {
+  display: none;
 }
 
-/* 横屏手机 / 矮视口：以高度为约束缩放画布 */
-@media (orientation: landscape) and (max-height: 520px) {
-  .game-canvas {
-    max-height: min(calc(100dvh - 72px), calc(100dvw * 0.58));
-    width: auto;
-    max-width: 100%;
-    margin-left: auto;
-    margin-right: auto;
-  }
-}
-
-/* 横屏极矮：再压缩画布显示高度 */
-@media (orientation: landscape) and (max-height: 400px) {
-  .game-canvas {
-    max-height: min(calc(100dvh - 56px), 320px);
+@media (orientation: portrait) and (max-width: 767px) {
+  .portrait-hint-bar {
+    display: flex;
   }
 }
 
