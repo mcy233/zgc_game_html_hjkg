@@ -108,15 +108,9 @@ body,
   user-select: none;
 }
 
-/* 竖屏小屏提示条 */
+/* 竖屏提示条：已不再使用，始终隐藏 */
 .portrait-hint-bar {
   display: none;
-}
-
-@media (orientation: portrait) and (max-width: 767px) {
-  .portrait-hint-bar {
-    display: flex;
-  }
 }
 
 /* 补给站：仿原版木质柜台背景 */
