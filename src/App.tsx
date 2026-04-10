@@ -75,7 +75,7 @@ class Particle {
     this.color = color;
     this.size = Math.random() * 4 + 2;
   }
-  update() { this.x += this.vx; this.y += this.vy; this.life -= 0.02; }
+  update(dt = 1) { this.x += this.vx * dt; this.y += this.vy * dt; this.life -= 0.02 * dt; }
   draw(ctx: CanvasRenderingContext2D) {
     ctx.globalAlpha = this.life;
     ctx.fillStyle = this.color;
@@ -89,7 +89,7 @@ class FloatingText {
   constructor(x: number, y: number, text: string, color: string) {
     this.x = x; this.y = y; this.text = text; this.life = 1.0; this.color = color;
   }
-  update() { this.y -= 1; this.life -= 0.015; }
+  update(dt = 1) { this.y -= 1 * dt; this.life -= 0.015 * dt; }
   draw(ctx: CanvasRenderingContext2D) {
     ctx.globalAlpha = this.life;
     ctx.fillStyle = this.color;
@@ -129,6 +129,7 @@ export default function App() {
   const floatingTextsRef = useRef<FloatingText[]>([]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const requestRef = useRef<number>(null);
+  const lastTimeRef = useRef(0);
   const tickRef = useRef(0);
 
   useEffect(() => {
@@ -349,11 +350,18 @@ export default function App() {
     });
   }, []);
 
-  const update = useCallback(() => {
-    // Always request next frame to keep loop alive, or handle restart in useEffect
+  const update = useCallback((timestamp: number) => {
     requestRef.current = requestAnimationFrame(update);
 
-    if (gameStateRef.current.status !== 'PLAYING') return;
+    if (gameStateRef.current.status !== 'PLAYING') {
+      lastTimeRef.current = timestamp;
+      return;
+    }
+
+    const rawDt = lastTimeRef.current ? timestamp - lastTimeRef.current : 16.67;
+    lastTimeRef.current = timestamp;
+    const dt = Math.min(rawDt, 50);
+    const dtFactor = dt / 16.67;
 
     tickRef.current += 1;
     const h = { ...hookRef.current };
@@ -362,30 +370,26 @@ export default function App() {
     let bagShredBonus = 0;
     let bagStrengthBonus = 0;
 
-    // Update moving items (Interns)
     itemsRef.current.forEach(item => {
       if (item.vx !== undefined) {
         if (item.movePauseTimer && item.movePauseTimer > 0) {
-          item.movePauseTimer -= 16.67;
+          item.movePauseTimer -= dt;
         } else {
-          item.x += item.vx;
+          item.x += item.vx * dtFactor;
           if (item.x < (item.rangeMin || item.radius) || item.x > (item.rangeMax || CANVAS_WIDTH - item.radius)) {
             item.vx *= -1;
-            item.movePauseTimer = 1000; // 1s pause on direction change
+            item.movePauseTimer = 1000;
           }
         }
       }
     });
     itemsChanged = true;
 
-    // Handle hook pause timer - only affects hook logic
     let isHookPaused = false;
     if (gameStateRef.current.pauseTimer > 0) {
-      const newTimer = Math.max(0, gameStateRef.current.pauseTimer - 16.67);
+      const newTimer = Math.max(0, gameStateRef.current.pauseTimer - dt);
       
-      // If timer just finished, apply the large deflection
       if (newTimer === 0 && gameStateRef.current.pauseTimer > 0) {
-        // Large random deflection after pause
         h.angle = Math.PI * 0.1 + Math.random() * (Math.PI * 0.8);
         hookRef.current = h;
         setHook(h);
@@ -397,14 +401,13 @@ export default function App() {
 
     if (!isHookPaused) {
       if (h.state === 'SWINGING') {
-        h.angle += SWING_SPEED * h.swingDirection;
+        h.angle += SWING_SPEED * h.swingDirection * dtFactor;
         if (h.angle > Math.PI * 0.9 || h.angle < Math.PI * 0.1) h.swingDirection *= -1;
       } else if (h.state === 'EXTENDING') {
-      h.length += EXTEND_SPEED;
+      h.length += EXTEND_SPEED * dtFactor;
       const hX = MINER_X + Math.cos(h.angle) * h.length;
       const hY = MINER_Y + Math.sin(h.angle) * h.length;
       
-      // Check bounds
       if (hX < 0 || hX > CANVAS_WIDTH || hY > CANVAS_HEIGHT) {
         h.state = 'RETRACTING';
       }
@@ -419,7 +422,6 @@ export default function App() {
       if (hitIdx !== -1) {
         const hitItem = itemsRef.current[hitIdx];
         if (hitItem.type === 'TNT') {
-          // Explosion
           for (let i = 0; i < 30; i++) particlesRef.current.push(new Particle(hitItem.x, hitItem.y, '#ef4444'));
           const nearby = itemsRef.current.filter(it => {
             const dx = it.x - hitItem.x;
@@ -443,7 +445,7 @@ export default function App() {
         ? Math.max(0.8, (BASE_PULL_SPEED * gameStateRef.current.pullSpeedMultiplier) - (h.caughtItem.weight / gameStateRef.current.strength))
         : RETRACT_SPEED;
       
-      h.length -= pullSpeed;
+      h.length -= pullSpeed * dtFactor;
       
       if (h.length <= INITIAL_ROPE_LENGTH) {
         h.length = INITIAL_ROPE_LENGTH;
@@ -489,7 +491,6 @@ export default function App() {
             strength: prev.strength + bagStrengthBonus,
           }));
         } else {
-          // Normal return without item - small adjustment
           h.angle += (Math.random() - 0.5) * 0.2;
           h.angle = Math.max(Math.PI * 0.1, Math.min(Math.PI * 0.9, h.angle));
         }
@@ -497,10 +498,9 @@ export default function App() {
     }
   }
 
-    // Update particles and floating texts
-    particlesRef.current.forEach(p => p.update());
+    particlesRef.current.forEach(p => p.update(dtFactor));
     particlesRef.current = particlesRef.current.filter(p => p.life > 0);
-    floatingTextsRef.current.forEach(t => t.update());
+    floatingTextsRef.current.forEach(t => t.update(dtFactor));
     floatingTextsRef.current = floatingTextsRef.current.filter(t => t.life > 0);
 
     // Sync back to refs and state
