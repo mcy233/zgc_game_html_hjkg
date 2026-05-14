@@ -43,6 +43,11 @@ import {
   rollRandomShopOffers,
   buildLevelItems,
 } from './constants';
+import {
+  parseLinkUserIdFromUrl,
+  fetchAdmissionGameStatus,
+  registerAdmissionClear,
+} from './admissionApi';
 import { GameItem, GameState, ShopItemType } from './types';
 import { getCatchMumble, getShredderMumble } from './phdMumbles';
 
@@ -121,6 +126,18 @@ export default function App() {
   const [shopSelectedType, setShopSelectedType] = useState<ShopItemType | null>(null);
   const shopVisitActiveRef = useRef(false);
 
+  /** 汇总页 URL 参数 user_id；无参数时为 null，界面保持原样 */
+  const [linkUserId, setLinkUserId] = useState<string | null>(null);
+  const [remoteCleared, setRemoteCleared] = useState<boolean | null>(null);
+  const [remoteClearedAt, setRemoteClearedAt] = useState<string | null>(null);
+  const [remoteRank, setRemoteRank] = useState<number | null>(null);
+  const [admissionStatusLoading, setAdmissionStatusLoading] = useState(false);
+  const [admissionStatusError, setAdmissionStatusError] = useState<string | null>(null);
+  /** 每次进入学位授予典礼递增，用于同一会话内多次通关时重复触发登记 */
+  const [graduationTick, setGraduationTick] = useState(0);
+  const [registerSyncState, setRegisterSyncState] = useState<'idle' | 'pending' | 'ok' | 'error'>('idle');
+  const [registerSyncDetail, setRegisterSyncDetail] = useState<string | null>(null);
+
   // Refs for game loop to avoid stale closures and React update issues
   const itemsRef = useRef<GameItem[]>([]);
   const gameStateRef = useRef<GameState>(gameState);
@@ -131,6 +148,65 @@ export default function App() {
   const requestRef = useRef<number>(null);
   const lastTimeRef = useRef(0);
   const tickRef = useRef(0);
+
+  useEffect(() => {
+    setLinkUserId(parseLinkUserIdFromUrl());
+  }, []);
+
+  useEffect(() => {
+    if (!linkUserId) {
+      setRemoteCleared(null);
+      setRemoteClearedAt(null);
+      setRemoteRank(null);
+      setAdmissionStatusLoading(false);
+      setAdmissionStatusError(null);
+      return;
+    }
+    let cancelled = false;
+    setAdmissionStatusLoading(true);
+    setAdmissionStatusError(null);
+    fetchAdmissionGameStatus(linkUserId)
+      .then((s) => {
+        if (cancelled) return;
+        setRemoteCleared(s.cleared);
+        setRemoteClearedAt(s.cleared_at);
+        setRemoteRank(s.rank);
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        setRemoteCleared(null);
+        setRemoteClearedAt(null);
+        setRemoteRank(null);
+        setAdmissionStatusError(e instanceof Error ? e.message : String(e));
+      })
+      .finally(() => {
+        if (!cancelled) setAdmissionStatusLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [linkUserId]);
+
+  useEffect(() => {
+    if (gameState.status !== 'GRADUATED' || !linkUserId) return;
+    setRegisterSyncState('pending');
+    setRegisterSyncDetail(null);
+    registerAdmissionClear(linkUserId)
+      .then((res) => {
+        const gs = res.game_status;
+        if (gs) {
+          setRemoteCleared(gs.cleared);
+          setRemoteClearedAt(gs.cleared_at ?? null);
+          setRemoteRank(gs.rank ?? null);
+        }
+        setRegisterSyncState('ok');
+        setRegisterSyncDetail(res.message ?? '通关已登记');
+      })
+      .catch((e: unknown) => {
+        setRegisterSyncState('error');
+        setRegisterSyncDetail(e instanceof Error ? e.message : String(e));
+      });
+  }, [gameState.status, linkUserId, graduationTick]);
 
   useEffect(() => {
     if (!mumbleBubble) return;
@@ -216,6 +292,8 @@ export default function App() {
   }, []);
 
   const startGame = () => {
+    setRegisterSyncState('idle');
+    setRegisterSyncDetail(null);
     const newState: GameState = { 
       ...gameState, 
       score: 0, 
@@ -776,6 +854,14 @@ export default function App() {
   const showMinerHud = gameState.status === 'PLAYING' || gameState.status === 'TUTORIAL_OVERLAY';
   const shredderDim = gameState.status !== 'PLAYING' || gameState.hasShredder <= 0;
 
+  const admissionStatusLabel = (() => {
+    if (admissionStatusLoading) return '同步中…';
+    if (admissionStatusError) return '状态未获取';
+    if (remoteCleared === true) return '本游戏已通关';
+    if (remoteCleared === false) return '本游戏未通关';
+    return '—';
+  })();
+
   return (
     <div className="app-shell-fill box-border flex flex-col items-center justify-center gap-1 bg-slate-950 font-sans text-slate-100 app-safe-x app-safe-b app-safe-t px-2 sm:px-4 md:gap-2">
       <div
@@ -785,6 +871,35 @@ export default function App() {
         <span aria-hidden>↻</span>
         横屏可显示更大画面；竖屏已自动缩放至一屏内，无需拖动页面。
       </div>
+      {linkUserId && (
+        <div
+          className="shrink-0 w-full max-w-[min(100%,52rem)] rounded-lg border border-sky-800/60 bg-slate-900/90 px-2 py-1.5 text-center text-[10px] leading-snug text-sky-100/95 sm:text-[11px]"
+          role="status"
+        >
+          <span className="font-black text-sky-300/95">活动关联</span>
+          <span className="text-slate-500"> · </span>
+          <span className="tabular-nums text-slate-200">user_id {linkUserId}</span>
+          <span className="text-slate-500"> · </span>
+          <span>{admissionStatusLabel}</span>
+          {remoteCleared === true && remoteClearedAt && (
+            <>
+              <span className="text-slate-500"> · </span>
+              <span className="text-slate-400">通关时间 {remoteClearedAt}</span>
+            </>
+          )}
+          {remoteRank != null && (
+            <>
+              <span className="text-slate-500"> · </span>
+              <span className="text-slate-400">本游戏榜 #{remoteRank}</span>
+            </>
+          )}
+          {admissionStatusError && (
+            <span className="block truncate text-red-300/90" title={admissionStatusError}>
+              {admissionStatusError}
+            </span>
+          )}
+        </div>
+      )}
       <div className="game-viewport relative">
         <div className="game-stage-outer group relative shrink-0 overflow-hidden rounded-2xl border-4 border-slate-800/80 bg-slate-950 shadow-[0_0_80px_rgba(0,0,0,0.6)] sm:rounded-[2rem] sm:border-[10px] lg:rounded-[3rem] lg:border-[12px] game-stage-shell">
         <canvas
@@ -940,7 +1055,14 @@ export default function App() {
                   </p>
                   <div className="flex flex-col gap-3">
                     {gameState.level === 8 ? (
-                      <button onClick={() => setGameState(prev => ({ ...prev, status: 'GRADUATED' }))} className="flex w-full items-center justify-center gap-2 rounded-xl bg-sky-500 py-3 text-base font-black text-slate-950 hover:bg-sky-400">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (linkUserId) setGraduationTick((t) => t + 1);
+                          setGameState((prev) => ({ ...prev, status: 'GRADUATED' }));
+                        }}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-sky-500 py-3 text-base font-black text-slate-950 hover:bg-sky-400"
+                      >
                         <Sparkles size={18} /> 参加学位授予典礼
                       </button>
                     ) : (
@@ -967,6 +1089,21 @@ export default function App() {
                   <p className="mx-auto mb-6 max-w-lg px-1 text-sm leading-relaxed text-slate-400 sm:mb-8 sm:text-lg">
                     历经八个培养阶段，你在潜空间中交出了扎实的 AI 成果。学位论文答辩顺利通过——<strong className="text-slate-300">北京中关村学院</strong>为你骄傲，愿你在人工智能前沿继续攀登。
                   </p>
+                  {linkUserId && (
+                    <p className="mx-auto mb-4 max-w-lg rounded-xl border border-slate-700/80 bg-slate-900/60 px-3 py-2 text-left text-xs leading-relaxed text-slate-300 sm:text-sm">
+                      <span className="font-black text-sky-400">排行榜同步</span>
+                      {registerSyncState === 'pending' && <span className="text-slate-400">：正在登记通关…</span>}
+                      {registerSyncState === 'ok' && (
+                        <span className="text-slate-300">：{registerSyncDetail ?? '已连接服务器'}</span>
+                      )}
+                      {registerSyncState === 'error' && (
+                        <span className="text-red-300/95" title={registerSyncDetail ?? ''}>
+                          ：登记失败{registerSyncDetail ? `（${registerSyncDetail}）` : ''}
+                        </span>
+                      )}
+                      {registerSyncState === 'idle' && <span className="text-slate-500">：等待同步</span>}
+                    </p>
+                  )}
                   <div className="mb-8 inline-block rounded-2xl border border-slate-800 bg-slate-900/50 p-6 backdrop-blur">
                     <div className="mb-1 text-xs uppercase tracking-widest text-slate-500">累计培养积分</div>
                     <div className="text-4xl font-black text-green-400">{gameState.score}</div>
