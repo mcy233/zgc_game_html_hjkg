@@ -7,7 +7,7 @@ export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
   return {
     /** GitHub Pages 项目站：https://mcy233.github.io/zgc_game_html_hjkg/ */
-    base: mode === 'production' ? '/zgc_game_html_hjkg/' : '/',
+    base: '/zgc-game-html-hjkg/',
     plugins: [react(), tailwindcss()],
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),

@@ -51,6 +51,25 @@ import {
 import { GameItem, GameState, ShopItemType } from './types';
 import { getCatchMumble, getShredderMumble } from './phdMumbles';
 
+function formatApiTime(value: string): string {
+  let parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    parsed = new Date(value.replace(' ', 'T') + 'Z');
+  }
+
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, '0');
+  const day = String(parsed.getDate()).padStart(2, '0');
+  const hours = String(parsed.getHours()).padStart(2, '0');
+  const minutes = String(parsed.getMinutes()).padStart(2, '0');
+  const seconds = String(parsed.getSeconds()).padStart(2, '0');
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
 function shopRowIcon(type: ShopItemType, iconClass = 'w-7 h-7'): React.ReactNode {
   switch (type) {
     case 'COFFEE': return <Coffee className={iconClass} />;
@@ -884,7 +903,7 @@ export default function App() {
           {remoteCleared === true && remoteClearedAt && (
             <>
               <span className="text-slate-500"> · </span>
-              <span className="text-slate-400">通关时间 {remoteClearedAt}</span>
+              <span className="text-slate-400">通关时间 {formatApiTime(remoteClearedAt)}</span>
             </>
           )}
           {remoteRank != null && (
