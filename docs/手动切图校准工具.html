@@ -1,0 +1,723 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>手动切图校准工具</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #020617;
+      --panel: rgba(15, 23, 42, 0.88);
+      --line: rgba(125, 211, 252, 0.28);
+      --text: #e0f2fe;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --warn: #fbbf24;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at top, rgba(14, 165, 233, 0.18), transparent 42rem),
+        linear-gradient(180deg, #020617, #07111f 55%, #020617);
+      color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    header {
+      padding: 18px 22px 12px;
+      border-bottom: 1px solid rgba(56, 189, 248, 0.18);
+      background: rgba(2, 6, 23, 0.72);
+      backdrop-filter: blur(12px);
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 22px;
+      line-height: 1.2;
+    }
+
+    header p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(340px, 1fr) 360px;
+      gap: 14px;
+      padding: 14px;
+    }
+
+    .stage, .side {
+      min-height: calc(100vh - 114px);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--panel);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.28);
+      overflow: hidden;
+    }
+
+    .stage-toolbar, .section {
+      border-bottom: 1px solid rgba(125, 211, 252, 0.16);
+      padding: 12px;
+    }
+
+    .stage-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .canvas-wrap {
+      position: relative;
+      height: calc(100vh - 184px);
+      min-height: 480px;
+      overflow: auto;
+      background:
+        linear-gradient(45deg, rgba(255,255,255,0.04) 25%, transparent 25%),
+        linear-gradient(-45deg, rgba(255,255,255,0.04) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, rgba(255,255,255,0.04) 75%),
+        linear-gradient(-45deg, transparent 75%, rgba(255,255,255,0.04) 75%);
+      background-size: 24px 24px;
+      background-position: 0 0, 0 12px, 12px -12px, -12px 0;
+    }
+
+    canvas {
+      display: block;
+      margin: 18px auto;
+      image-rendering: auto;
+      cursor: crosshair;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      color: #bae6fd;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    input[type="file"],
+    input[type="number"],
+    input[type="range"],
+    input[type="text"],
+    select,
+    textarea {
+      width: 100%;
+      border: 1px solid rgba(125, 211, 252, 0.24);
+      border-radius: 10px;
+      background: rgba(2, 6, 23, 0.68);
+      color: var(--text);
+      padding: 8px 9px;
+      font: inherit;
+      font-size: 13px;
+      outline: none;
+    }
+
+    textarea {
+      min-height: 150px;
+      resize: vertical;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: 12px;
+    }
+
+    input[type="range"] { padding: 0; }
+
+    .grid2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .grid4 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
+      gap: 8px;
+    }
+
+    .row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .row > * { flex: 1; }
+
+    .side {
+      overflow: auto;
+    }
+
+    .section h2 {
+      margin: 0 0 10px;
+      font-size: 15px;
+    }
+
+    .hint {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    button {
+      border: 1px solid rgba(125, 211, 252, 0.34);
+      border-radius: 12px;
+      background: linear-gradient(180deg, rgba(14,165,233,0.92), rgba(37,99,235,0.9));
+      color: white;
+      padding: 9px 12px;
+      font-weight: 900;
+      cursor: pointer;
+      box-shadow: 0 10px 28px rgba(14, 165, 233, 0.2);
+    }
+
+    button.secondary {
+      background: rgba(15, 23, 42, 0.92);
+      color: #bae6fd;
+      box-shadow: none;
+    }
+
+    button.warn {
+      border-color: rgba(251, 191, 36, 0.55);
+      background: linear-gradient(180deg, #f59e0b, #d97706);
+      color: #111827;
+    }
+
+    .preview {
+      display: grid;
+      place-items: center;
+      min-height: 180px;
+      border-radius: 14px;
+      border: 1px solid rgba(125, 211, 252, 0.18);
+      background: #020617;
+      overflow: hidden;
+    }
+
+    .preview.checker {
+      background:
+        linear-gradient(45deg, #111827 25%, transparent 25%),
+        linear-gradient(-45deg, #111827 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #111827 75%),
+        linear-gradient(-45deg, transparent 75%, #111827 75%),
+        #020617;
+      background-size: 20px 20px;
+      background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+    }
+
+    #previewCanvas {
+      max-width: 100%;
+      max-height: 260px;
+      margin: 0;
+    }
+
+    kbd {
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      border-radius: 6px;
+      background: rgba(15, 23, 42, 0.9);
+      padding: 1px 5px;
+      color: #e2e8f0;
+      font-size: 11px;
+    }
+
+    @media (max-width: 980px) {
+      main { grid-template-columns: 1fr; }
+      .stage, .side { min-height: auto; }
+      .canvas-wrap { height: 62vh; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>手动切图校准工具</h1>
+    <p>
+      用于修正 AI 元素集合的裁切边界、洋红抠图参数和边缘留白。导出 PNG 后放回 `public/assets/...`，或把右侧 JSON 发给我，我可以按参数批量重切。
+    </p>
+  </header>
+
+  <main>
+    <section class="stage">
+      <div class="stage-toolbar">
+        <div style="min-width: 280px; flex: 2">
+          <label>选择源图（resources 里的 PNG）</label>
+          <input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp" />
+        </div>
+        <div style="min-width: 160px">
+          <label>视图缩放</label>
+          <select id="zoom">
+            <option value="0.25">25%</option>
+            <option value="0.33">33%</option>
+            <option value="0.5" selected>50%</option>
+            <option value="0.67">67%</option>
+            <option value="1">100%</option>
+            <option value="1.5">150%</option>
+          </select>
+        </div>
+        <button id="fitRect" class="secondary" type="button">裁切框居中</button>
+        <button id="downloadPng" type="button">导出 PNG</button>
+      </div>
+      <div class="canvas-wrap" id="canvasWrap">
+        <canvas id="mainCanvas"></canvas>
+      </div>
+    </section>
+
+    <aside class="side">
+      <div class="section">
+        <h2>1. 裁切框</h2>
+        <div class="grid4">
+          <div><label>X</label><input id="cropX" type="number" step="1" /></div>
+          <div><label>Y</label><input id="cropY" type="number" step="1" /></div>
+          <div><label>W</label><input id="cropW" type="number" step="1" /></div>
+          <div><label>H</label><input id="cropH" type="number" step="1" /></div>
+        </div>
+        <p class="hint">
+          鼠标拖拽红框移动，拖拽四角圆点缩放。方向键微调，<kbd>Shift</kbd> + 方向键每次移动 10px。
+        </p>
+      </div>
+
+      <div class="section">
+        <h2>2. 抠图参数</h2>
+        <div class="grid2">
+          <div>
+            <label>洋红容差 <span id="tolText"></span></label>
+            <input id="tolerance" type="range" min="10" max="140" value="58" />
+          </div>
+          <div>
+            <label>软边范围 <span id="rampText"></span></label>
+            <input id="ramp" type="range" min="20" max="260" value="170" />
+          </div>
+          <div>
+            <label>边缘去洋红</label>
+            <select id="despill">
+              <option value="1" selected>开启</option>
+              <option value="0">关闭</option>
+            </select>
+          </div>
+          <div>
+            <label>预览背景</label>
+            <select id="previewBg">
+              <option value="dark" selected>深色游戏底</option>
+              <option value="checker">透明棋盘格</option>
+              <option value="magenta">原洋红底</option>
+            </select>
+          </div>
+        </div>
+        <p class="hint">
+          如果边缘发紫，适当提高“软边范围”并开启去洋红；如果主体被吃掉，降低“洋红容差”。
+        </p>
+      </div>
+
+      <div class="section">
+        <h2>3. 预览</h2>
+        <div class="preview" id="previewBox">
+          <canvas id="previewCanvas"></canvas>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>4. 输出命名</h2>
+        <label>建议输出文件名</label>
+        <input id="outputName" type="text" value="asset-slice.png" />
+        <label style="margin-top: 10px">布局工具引用路径</label>
+        <input id="layoutAssetPath" type="text" value="../public/assets/ui/custom/asset-slice.png" />
+        <div class="row" style="margin-top: 10px">
+          <button id="copyJson" class="secondary" type="button">复制 JSON</button>
+          <button id="downloadJson" class="secondary" type="button">下载 JSON</button>
+        </div>
+        <button id="copyLayoutAssetJson" class="warn" style="width: 100%; margin-top: 10px" type="button">复制给 UI 布局工具的素材 JSON</button>
+      </div>
+
+      <div class="section">
+        <h2>5. 参数 JSON</h2>
+        <textarea id="jsonOut" spellcheck="false"></textarea>
+        <p class="hint">把这里的 JSON 发给我，我可以按你的手调坐标重新批量切图并接入游戏。</p>
+      </div>
+    </aside>
+  </main>
+
+  <script>
+    const mainCanvas = document.getElementById('mainCanvas');
+    const mainCtx = mainCanvas.getContext('2d');
+    const previewCanvas = document.getElementById('previewCanvas');
+    const previewCtx = previewCanvas.getContext('2d');
+    const fileInput = document.getElementById('fileInput');
+    const zoomEl = document.getElementById('zoom');
+    const previewBox = document.getElementById('previewBox');
+
+    const inputs = {
+      x: document.getElementById('cropX'),
+      y: document.getElementById('cropY'),
+      w: document.getElementById('cropW'),
+      h: document.getElementById('cropH'),
+      tolerance: document.getElementById('tolerance'),
+      ramp: document.getElementById('ramp'),
+      despill: document.getElementById('despill'),
+      previewBg: document.getElementById('previewBg'),
+      outputName: document.getElementById('outputName'),
+      layoutAssetPath: document.getElementById('layoutAssetPath'),
+      jsonOut: document.getElementById('jsonOut'),
+    };
+
+    const state = {
+      image: null,
+      imageName: '',
+      zoom: Number(zoomEl.value),
+      crop: { x: 80, y: 80, w: 240, h: 180 },
+      drag: null,
+    };
+
+    function clamp(n, lo, hi) {
+      return Math.max(lo, Math.min(hi, n));
+    }
+
+    function updateInputsFromState() {
+      inputs.x.value = Math.round(state.crop.x);
+      inputs.y.value = Math.round(state.crop.y);
+      inputs.w.value = Math.round(state.crop.w);
+      inputs.h.value = Math.round(state.crop.h);
+      document.getElementById('tolText').textContent = inputs.tolerance.value;
+      document.getElementById('rampText').textContent = inputs.ramp.value;
+    }
+
+    function updateStateFromInputs() {
+      if (!state.image) return;
+      const maxW = state.image.naturalWidth;
+      const maxH = state.image.naturalHeight;
+      const x = Number(inputs.x.value) || 0;
+      const y = Number(inputs.y.value) || 0;
+      const w = Math.max(1, Number(inputs.w.value) || 1);
+      const h = Math.max(1, Number(inputs.h.value) || 1);
+      state.crop = {
+        x: clamp(x, 0, maxW - 1),
+        y: clamp(y, 0, maxH - 1),
+        w: clamp(w, 1, maxW - x),
+        h: clamp(h, 1, maxH - y),
+      };
+    }
+
+    function drawMain() {
+      if (!state.image) {
+        mainCanvas.width = 900;
+        mainCanvas.height = 520;
+        mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+        mainCtx.fillStyle = '#0f172a';
+        mainCtx.fillRect(0, 0, mainCanvas.width, mainCanvas.height);
+        mainCtx.fillStyle = '#94a3b8';
+        mainCtx.font = '18px sans-serif';
+        mainCtx.textAlign = 'center';
+        mainCtx.fillText('请选择一张源图开始手动切图', mainCanvas.width / 2, mainCanvas.height / 2);
+        return;
+      }
+
+      const z = state.zoom;
+      mainCanvas.width = Math.round(state.image.naturalWidth * z);
+      mainCanvas.height = Math.round(state.image.naturalHeight * z);
+      mainCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
+      mainCtx.drawImage(state.image, 0, 0, mainCanvas.width, mainCanvas.height);
+
+      const { x, y, w, h } = state.crop;
+      mainCtx.save();
+      mainCtx.scale(z, z);
+      mainCtx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+      mainCtx.fillRect(0, 0, state.image.naturalWidth, state.image.naturalHeight);
+      mainCtx.clearRect(x, y, w, h);
+      mainCtx.drawImage(state.image, x, y, w, h, x, y, w, h);
+      mainCtx.strokeStyle = '#f97316';
+      mainCtx.lineWidth = 3 / z;
+      mainCtx.setLineDash([10 / z, 6 / z]);
+      mainCtx.strokeRect(x, y, w, h);
+      mainCtx.setLineDash([]);
+      const handle = 9 / z;
+      mainCtx.fillStyle = '#38bdf8';
+      for (const p of handlePoints()) {
+        mainCtx.beginPath();
+        mainCtx.arc(p.x, p.y, handle, 0, Math.PI * 2);
+        mainCtx.fill();
+      }
+      mainCtx.restore();
+    }
+
+    function handlePoints() {
+      const { x, y, w, h } = state.crop;
+      return [
+        { name: 'nw', x, y },
+        { name: 'ne', x: x + w, y },
+        { name: 'sw', x, y: y + h },
+        { name: 'se', x: x + w, y: y + h },
+      ];
+    }
+
+    function processCrop() {
+      if (!state.image) return null;
+      const { x, y, w, h } = state.crop;
+      const src = document.createElement('canvas');
+      src.width = Math.round(w);
+      src.height = Math.round(h);
+      const sctx = src.getContext('2d');
+      sctx.drawImage(state.image, x, y, w, h, 0, 0, src.width, src.height);
+
+      if (inputs.previewBg.value === 'magenta') return src;
+
+      const tolerance = Number(inputs.tolerance.value);
+      const ramp = Number(inputs.ramp.value);
+      const despill = inputs.despill.value === '1';
+      const img = sctx.getImageData(0, 0, src.width, src.height);
+      const data = img.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
+        const d = Math.hypot(r - 255, g, b - 255);
+        if (d <= tolerance) {
+          data[i + 3] = 0;
+          continue;
+        }
+        if (d < tolerance + ramp) {
+          const af = clamp((d - tolerance) / ramp, 0, 1);
+          if (af < 0.04) {
+            data[i + 3] = 0;
+            continue;
+          }
+          if (despill) {
+            data[i] = clamp((r - (1 - af) * 255) / af, 0, 255);
+            data[i + 1] = clamp(g / af, 0, 255);
+            data[i + 2] = clamp((b - (1 - af) * 255) / af, 0, 255);
+          }
+          data[i + 3] = Math.round(a * af);
+        }
+      }
+      sctx.putImageData(img, 0, 0);
+      return src;
+    }
+
+    function drawPreview() {
+      const processed = processCrop();
+      if (!processed) return;
+      previewBox.classList.toggle('checker', inputs.previewBg.value === 'checker');
+      previewBox.style.backgroundColor = inputs.previewBg.value === 'magenta' ? '#ff00ff' : '#020617';
+      const maxW = 320;
+      const maxH = 260;
+      const scale = Math.min(1, maxW / processed.width, maxH / processed.height);
+      previewCanvas.width = Math.max(1, Math.round(processed.width * scale));
+      previewCanvas.height = Math.max(1, Math.round(processed.height * scale));
+      previewCtx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+      previewCtx.drawImage(processed, 0, 0, previewCanvas.width, previewCanvas.height);
+    }
+
+    function currentJson() {
+      const output = inputs.outputName.value || 'asset-slice.png';
+      return {
+        source: state.imageName,
+        output,
+        crop: {
+          x: Math.round(state.crop.x),
+          y: Math.round(state.crop.y),
+          w: Math.round(state.crop.w),
+          h: Math.round(state.crop.h),
+        },
+        key: {
+          color: '#FF00FF',
+          tolerance: Number(inputs.tolerance.value),
+          ramp: Number(inputs.ramp.value),
+          despill: inputs.despill.value === '1',
+        },
+        layoutAsset: {
+          label: output,
+          src: inputs.layoutAssetPath.value || `../public/assets/ui/custom/${output}`,
+          w: Math.round(state.crop.w),
+          h: Math.round(state.crop.h),
+        },
+      };
+    }
+
+    function updateJson() {
+      inputs.jsonOut.value = JSON.stringify(currentJson(), null, 2);
+    }
+
+    function redrawAll() {
+      updateInputsFromState();
+      drawMain();
+      drawPreview();
+      updateJson();
+    }
+
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        state.image = img;
+        state.imageName = file.name;
+        state.crop = {
+          x: Math.round(img.naturalWidth * 0.25),
+          y: Math.round(img.naturalHeight * 0.25),
+          w: Math.round(img.naturalWidth * 0.45),
+          h: Math.round(img.naturalHeight * 0.25),
+        };
+        inputs.outputName.value = file.name.replace(/\.[^.]+$/, '') + '-slice.png';
+        inputs.layoutAssetPath.value = `../public/assets/ui/custom/${inputs.outputName.value}`;
+        redrawAll();
+      };
+      img.src = url;
+    });
+
+    zoomEl.addEventListener('change', () => {
+      state.zoom = Number(zoomEl.value);
+      drawMain();
+    });
+
+    for (const el of [inputs.x, inputs.y, inputs.w, inputs.h]) {
+      el.addEventListener('input', () => {
+        updateStateFromInputs();
+        redrawAll();
+      });
+    }
+
+    for (const el of [inputs.tolerance, inputs.ramp, inputs.despill, inputs.previewBg, inputs.outputName, inputs.layoutAssetPath]) {
+      el.addEventListener('input', () => {
+        updateInputsFromState();
+        drawPreview();
+        updateJson();
+      });
+      el.addEventListener('change', () => {
+        updateInputsFromState();
+        drawPreview();
+        updateJson();
+      });
+    }
+
+    function pointerToImage(e) {
+      const rect = mainCanvas.getBoundingClientRect();
+      return {
+        x: (e.clientX - rect.left) / state.zoom,
+        y: (e.clientY - rect.top) / state.zoom,
+      };
+    }
+
+    function hitTest(p) {
+      const { x, y, w, h } = state.crop;
+      const threshold = 14 / state.zoom;
+      for (const hp of handlePoints()) {
+        if (Math.hypot(p.x - hp.x, p.y - hp.y) <= threshold) return hp.name;
+      }
+      if (p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h) return 'move';
+      return null;
+    }
+
+    mainCanvas.addEventListener('pointerdown', (e) => {
+      if (!state.image) return;
+      const p = pointerToImage(e);
+      const hit = hitTest(p);
+      if (!hit) return;
+      mainCanvas.setPointerCapture(e.pointerId);
+      state.drag = {
+        mode: hit,
+        start: p,
+        crop: { ...state.crop },
+      };
+    });
+
+    mainCanvas.addEventListener('pointermove', (e) => {
+      if (!state.image || !state.drag) return;
+      const p = pointerToImage(e);
+      const dx = p.x - state.drag.start.x;
+      const dy = p.y - state.drag.start.y;
+      const c = { ...state.drag.crop };
+      const minSize = 4;
+      if (state.drag.mode === 'move') {
+        c.x += dx; c.y += dy;
+      } else {
+        if (state.drag.mode.includes('w')) { c.x += dx; c.w -= dx; }
+        if (state.drag.mode.includes('e')) { c.w += dx; }
+        if (state.drag.mode.includes('n')) { c.y += dy; c.h -= dy; }
+        if (state.drag.mode.includes('s')) { c.h += dy; }
+      }
+      if (c.w < minSize) c.w = minSize;
+      if (c.h < minSize) c.h = minSize;
+      c.x = clamp(c.x, 0, state.image.naturalWidth - c.w);
+      c.y = clamp(c.y, 0, state.image.naturalHeight - c.h);
+      c.w = clamp(c.w, minSize, state.image.naturalWidth - c.x);
+      c.h = clamp(c.h, minSize, state.image.naturalHeight - c.y);
+      state.crop = c;
+      redrawAll();
+    });
+
+    mainCanvas.addEventListener('pointerup', (e) => {
+      state.drag = null;
+      try { mainCanvas.releasePointerCapture(e.pointerId); } catch {}
+    });
+
+    document.getElementById('fitRect').addEventListener('click', () => {
+      if (!state.image) return;
+      state.crop = {
+        x: Math.round(state.image.naturalWidth * 0.25),
+        y: Math.round(state.image.naturalHeight * 0.25),
+        w: Math.round(state.image.naturalWidth * 0.5),
+        h: Math.round(state.image.naturalHeight * 0.35),
+      };
+      redrawAll();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (!state.image) return;
+      const step = e.shiftKey ? 10 : 1;
+      let used = true;
+      if (e.key === 'ArrowLeft') state.crop.x -= step;
+      else if (e.key === 'ArrowRight') state.crop.x += step;
+      else if (e.key === 'ArrowUp') state.crop.y -= step;
+      else if (e.key === 'ArrowDown') state.crop.y += step;
+      else used = false;
+      if (used) {
+        e.preventDefault();
+        state.crop.x = clamp(state.crop.x, 0, state.image.naturalWidth - state.crop.w);
+        state.crop.y = clamp(state.crop.y, 0, state.image.naturalHeight - state.crop.h);
+        redrawAll();
+      }
+    });
+
+    function downloadBlob(blob, name) {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    }
+
+    document.getElementById('downloadPng').addEventListener('click', () => {
+      const processed = processCrop();
+      if (!processed) return;
+      processed.toBlob((blob) => {
+        if (blob) downloadBlob(blob, inputs.outputName.value || 'asset-slice.png');
+      }, 'image/png');
+    });
+
+    document.getElementById('copyJson').addEventListener('click', async () => {
+      updateJson();
+      await navigator.clipboard.writeText(inputs.jsonOut.value);
+      alert('已复制 JSON');
+    });
+
+    document.getElementById('copyLayoutAssetJson').addEventListener('click', async () => {
+      const data = { layoutAsset: currentJson().layoutAsset };
+      await navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+      alert('已复制布局工具素材 JSON，可粘贴到 UI 布局工具右侧 JSON 框后点“应用 JSON”');
+    });
+
+    document.getElementById('downloadJson').addEventListener('click', () => {
+      updateJson();
+      const blob = new Blob([inputs.jsonOut.value], { type: 'application/json' });
+      downloadBlob(blob, (inputs.outputName.value || 'asset-slice.png').replace(/\.png$/i, '.json'));
+    });
+
+    redrawAll();
+  </script>
+</body>
+</html>

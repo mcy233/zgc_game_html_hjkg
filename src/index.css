@@ -71,15 +71,15 @@ body,
   box-sizing: border-box;
   margin-left: auto;
   margin-right: auto;
-  aspect-ratio: 800 / 600;
-  max-width: 800px;
+  aspect-ratio: var(--stage-ratio, 1.333333);
+  max-width: var(--stage-max-width, 800px);
   container-type: inline-size;
   container-name: stage;
 }
 
 @supports (width: 1cqw) {
   .game-stage-shell {
-    width: min(100cqw, calc(100cqh * 800 / 600), 800px);
+    width: min(100cqw, calc(100cqh * var(--stage-ratio, 1.333333)), var(--stage-max-width, 800px));
     max-height: 100cqh;
   }
 }
@@ -93,8 +93,8 @@ body,
     max-height: calc(100svh - var(--game-chrome-v));
     width: min(
       calc(100vw - 12px),
-      calc((100svh - var(--game-chrome-v)) * 800 / 600),
-      800px
+      calc((100svh - var(--game-chrome-v)) * var(--stage-ratio, 1.333333)),
+      var(--stage-max-width, 800px)
     );
   }
 }

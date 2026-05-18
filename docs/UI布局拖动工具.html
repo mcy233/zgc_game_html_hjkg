@@ -1,0 +1,1293 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>UI 布局拖动工具</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #020617;
+      --panel: rgba(15, 23, 42, 0.9);
+      --panel-2: rgba(2, 6, 23, 0.72);
+      --line: rgba(125, 211, 252, 0.25);
+      --text: #e0f2fe;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --selected: #f97316;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 0%, rgba(14, 165, 233, 0.18), transparent 42rem),
+        linear-gradient(180deg, #020617, #07111f 55%, #020617);
+      color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    header {
+      height: 62px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 10px 14px;
+      border-bottom: 1px solid rgba(56, 189, 248, 0.18);
+      background: rgba(2, 6, 23, 0.78);
+      backdrop-filter: blur(12px);
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 18px;
+      white-space: nowrap;
+    }
+
+    header .hint {
+      min-width: 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .app {
+      height: calc(100vh - 62px);
+      display: grid;
+      grid-template-columns: 300px minmax(420px, 1fr) 360px;
+      grid-template-areas: "left workspace right";
+      gap: 10px;
+      padding: 10px;
+    }
+
+    .pane {
+      min-height: 0;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--panel);
+      box-shadow: 0 22px 60px rgba(0, 0, 0, 0.24);
+      overflow: hidden;
+    }
+
+    .left, .right {
+      display: flex;
+      flex-direction: column;
+      overflow: auto;
+    }
+
+    .left { grid-area: left; }
+    .right { grid-area: right; }
+
+    .section {
+      padding: 12px;
+      border-bottom: 1px solid rgba(125, 211, 252, 0.16);
+    }
+
+    .scroll {
+      overflow: auto;
+      min-height: 0;
+      flex: 1;
+    }
+
+    h2 {
+      margin: 0 0 10px;
+      font-size: 14px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 5px;
+      color: #bae6fd;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      border: 1px solid rgba(125, 211, 252, 0.24);
+      border-radius: 10px;
+      background: rgba(2, 6, 23, 0.68);
+      color: var(--text);
+      padding: 8px 9px;
+      font: inherit;
+      font-size: 13px;
+      outline: none;
+    }
+
+    textarea {
+      min-height: 200px;
+      resize: vertical;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    button {
+      border: 1px solid rgba(125, 211, 252, 0.34);
+      border-radius: 11px;
+      background: linear-gradient(180deg, rgba(14,165,233,0.95), rgba(37,99,235,0.9));
+      color: white;
+      padding: 8px 10px;
+      font-weight: 900;
+      cursor: pointer;
+      box-shadow: 0 10px 26px rgba(14, 165, 233, 0.18);
+    }
+
+    button.secondary {
+      background: rgba(15, 23, 42, 0.96);
+      color: #bae6fd;
+      box-shadow: none;
+    }
+
+    button.danger {
+      border-color: rgba(248, 113, 113, 0.5);
+      background: linear-gradient(180deg, #ef4444, #991b1b);
+    }
+
+    .grid2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .grid4 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
+      gap: 8px;
+    }
+
+    .row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .row > * { flex: 1; }
+
+    .module-list {
+      display: grid;
+      gap: 8px;
+      max-height: 260px;
+      overflow: auto;
+      padding-right: 2px;
+    }
+
+    .asset-library {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      max-height: 210px;
+      overflow: auto;
+      padding-right: 2px;
+    }
+
+    .asset-card {
+      min-width: 0;
+      border: 1px solid rgba(125, 211, 252, 0.18);
+      border-radius: 10px;
+      background: rgba(2, 6, 23, 0.52);
+      color: #e0f2fe;
+      padding: 6px;
+      box-shadow: none;
+    }
+
+    .asset-card img {
+      display: block;
+      width: 100%;
+      aspect-ratio: 1;
+      object-fit: contain;
+      border-radius: 7px;
+      background:
+        linear-gradient(45deg, rgba(255,255,255,0.06) 25%, transparent 25%),
+        linear-gradient(-45deg, rgba(255,255,255,0.06) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, rgba(255,255,255,0.06) 75%),
+        linear-gradient(-45deg, transparent 75%, rgba(255,255,255,0.06) 75%),
+        #020617;
+      background-size: 14px 14px;
+      background-position: 0 0, 0 7px, 7px -7px, -7px 0;
+    }
+
+    .asset-card span {
+      display: block;
+      margin-top: 5px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 10px;
+      font-weight: 800;
+    }
+
+    .module-btn {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      width: 100%;
+      text-align: left;
+      border-color: rgba(125, 211, 252, 0.18);
+      background: rgba(2, 6, 23, 0.54);
+      color: #e0f2fe;
+      box-shadow: none;
+    }
+
+    .module-btn small {
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .layer-item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 6px;
+      align-items: center;
+      margin-bottom: 6px;
+      padding: 8px;
+      border: 1px solid rgba(125, 211, 252, 0.16);
+      border-radius: 10px;
+      background: rgba(2, 6, 23, 0.46);
+      cursor: pointer;
+    }
+
+    .layer-item.selected {
+      border-color: var(--selected);
+      background: rgba(249, 115, 22, 0.14);
+    }
+
+    .layer-item .name {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .layer-item .meta {
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .workspace {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      grid-area: workspace;
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      padding: 10px;
+      border-bottom: 1px solid rgba(125, 211, 252, 0.16);
+      background: rgba(2, 6, 23, 0.5);
+    }
+
+    .stage-wrap {
+      position: relative;
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      background:
+        linear-gradient(45deg, rgba(255,255,255,0.035) 25%, transparent 25%),
+        linear-gradient(-45deg, rgba(255,255,255,0.035) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, rgba(255,255,255,0.035) 75%),
+        linear-gradient(-45deg, transparent 75%, rgba(255,255,255,0.035) 75%),
+        #020617;
+      background-size: 24px 24px;
+      background-position: 0 0, 0 12px, 12px -12px, -12px 0;
+    }
+
+    .stage {
+      position: relative;
+      margin: 28px auto;
+      transform-origin: top center;
+      overflow: hidden;
+      border: 2px solid rgba(125, 211, 252, 0.45);
+      border-radius: 28px;
+      background: #020617;
+      box-shadow: 0 0 0 10px rgba(2, 6, 23, 0.72), 0 28px 80px rgba(0, 0, 0, 0.42);
+    }
+
+    .stage::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(56,189,248,0.1) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(56,189,248,0.1) 1px, transparent 1px);
+      background-size: var(--grid-size, 40px) var(--grid-size, 40px);
+      opacity: var(--grid-opacity, 0.45);
+      z-index: 9998;
+    }
+
+    .stage.hide-grid::before { display: none; }
+
+    .element {
+      position: absolute;
+      min-width: 8px;
+      min-height: 8px;
+      border: 1px solid rgba(56, 189, 248, 0.18);
+      border-radius: 8px;
+      user-select: none;
+      touch-action: none;
+      cursor: move;
+    }
+
+    .element.selected {
+      outline: 2px solid var(--selected);
+      outline-offset: 2px;
+      border-color: rgba(249, 115, 22, 0.7);
+    }
+
+    .element.locked {
+      cursor: not-allowed;
+      opacity: 0.65;
+    }
+
+    .element .label {
+      position: absolute;
+      left: 0;
+      top: -22px;
+      padding: 2px 6px;
+      border-radius: 6px;
+      background: rgba(2, 6, 23, 0.82);
+      color: #e0f2fe;
+      font-size: 11px;
+      font-weight: 900;
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0;
+    }
+
+    .element.selected .label { opacity: 1; }
+
+    .element img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      pointer-events: none;
+    }
+
+    .element.text {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px;
+      text-align: center;
+      font-weight: 900;
+      color: white;
+      text-shadow: 0 2px 5px rgba(0,0,0,0.75);
+      background: rgba(15, 23, 42, 0.42);
+      border-style: dashed;
+    }
+
+    .element.panel {
+      background: rgba(15, 23, 42, 0.72);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.12);
+    }
+
+    .element.button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      color: white;
+      text-shadow: 0 2px 6px rgba(0,0,0,0.8);
+      background: linear-gradient(180deg, rgba(14,165,233,0.95), rgba(37,99,235,0.92));
+    }
+
+    .handle {
+      position: absolute;
+      right: -7px;
+      bottom: -7px;
+      width: 14px;
+      height: 14px;
+      border: 2px solid #020617;
+      border-radius: 999px;
+      background: var(--selected);
+      cursor: nwse-resize;
+      display: none;
+    }
+
+    .element.selected .handle { display: block; }
+
+    .hint {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      border: 1px solid rgba(125,211,252,0.18);
+      border-radius: 999px;
+      color: #bae6fd;
+      background: rgba(2,6,23,0.52);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .app.hide-left {
+      grid-template-columns: minmax(420px, 1fr) 360px;
+      grid-template-areas: "workspace right";
+    }
+
+    .app.hide-right {
+      grid-template-columns: 300px minmax(420px, 1fr);
+      grid-template-areas: "left workspace";
+    }
+
+    .app.hide-left.hide-right {
+      grid-template-columns: minmax(420px, 1fr);
+      grid-template-areas: "workspace";
+    }
+
+    .app.hide-left .left,
+    .app.hide-right .right {
+      display: none;
+    }
+
+    @media (max-width: 1100px) {
+      body { overflow: auto; }
+      .app {
+        height: auto;
+        grid-template-columns: 1fr;
+        grid-template-areas:
+          "workspace"
+          "left"
+          "right";
+      }
+      .stage-wrap { height: 72vh; }
+      .left, .right { max-height: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>UI 布局拖动工具</h1>
+    <div class="hint">
+      像 Unity Canvas 一样拖动/缩放 UI 模块。用于快速校准 9:20 游戏界面、补给站、弹窗等布局，最后导出 JSON 给开发接入。
+    </div>
+  </header>
+
+  <div class="app" id="app">
+    <aside class="pane left">
+      <div class="section">
+        <h2>场景</h2>
+        <label>选择场景预设</label>
+        <select id="sceneSelect"></select>
+        <div class="grid2" style="margin-top: 10px">
+          <button id="resetScene" class="secondary" type="button">重置场景</button>
+          <button id="exportPng" class="secondary" type="button">导出预览图</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>添加模块</h2>
+        <div id="moduleList" class="module-list"></div>
+      </div>
+
+      <div class="section">
+        <h2>切图素材联动</h2>
+        <label>导入刚切好的 PNG（可多选）</label>
+        <input id="assetFiles" type="file" accept="image/png,image/webp,image/jpeg" multiple />
+        <div style="margin-top: 10px">
+          <label>或注册本地相对路径</label>
+          <input id="assetPath" type="text" value="../public/assets/ui/custom/asset-slice.png" />
+        </div>
+        <div class="grid2" style="margin-top: 8px">
+          <button id="addPathAsset" class="secondary" type="button">注册路径</button>
+          <button id="clearAssets" class="secondary" type="button">清空临时素材</button>
+        </div>
+        <p class="hint">
+          如果切图工具导出的 PNG 覆盖保存到旧路径，刷新本工具即可看到新图。浏览器不能直接把文件写入项目目录，所以临时导入只在当前页面会话有效。
+        </p>
+        <div id="assetLibrary" class="asset-library" style="margin-top: 10px"></div>
+      </div>
+
+      <div class="section">
+        <h2>快捷操作</h2>
+        <div class="grid2">
+          <button id="duplicateEl" class="secondary" type="button">复制选中</button>
+          <button id="deleteEl" class="danger" type="button">删除选中</button>
+          <button id="frontEl" class="secondary" type="button">置顶</button>
+          <button id="backEl" class="secondary" type="button">置底</button>
+        </div>
+        <p class="hint">
+          方向键微调，<kbd>Shift</kbd> + 方向键移动 10px。拖动右下角橙点可缩放。
+        </p>
+      </div>
+
+      <div class="section" style="border-bottom: none">
+        <h2>图层</h2>
+        <div id="layerList"></div>
+      </div>
+    </aside>
+
+    <main class="pane workspace">
+      <div class="toolbar">
+        <span class="pill" id="stageInfo">720×1600</span>
+        <label style="width: 76px; margin: 0">缩放</label>
+        <select id="zoomSelect" style="width: 100px">
+          <option value="0.25">25%</option>
+          <option value="0.33">33%</option>
+          <option value="0.4" selected>40%</option>
+          <option value="0.5">50%</option>
+          <option value="0.67">67%</option>
+          <option value="1">100%</option>
+        </select>
+        <label style="width: 76px; margin: 0">网格</label>
+        <select id="gridSelect" style="width: 120px">
+          <option value="0">关闭</option>
+          <option value="20">20px</option>
+          <option value="40" selected>40px</option>
+          <option value="80">80px</option>
+        </select>
+        <button id="snapToggle" class="secondary" type="button">吸附：开</button>
+        <button id="refreshImages" class="secondary" type="button">刷新图片</button>
+        <button id="toggleLeft" class="secondary" type="button">隐藏左栏</button>
+        <button id="toggleRight" class="secondary" type="button">隐藏右栏</button>
+      </div>
+      <div class="stage-wrap" id="stageWrap">
+        <div id="stage" class="stage"></div>
+      </div>
+    </main>
+
+    <aside class="pane right">
+      <div class="section">
+        <h2>选中元素</h2>
+        <label>名称</label>
+        <input id="propName" type="text" />
+        <div class="grid4" style="margin-top: 10px">
+          <div><label>X</label><input id="propX" type="number" step="1" /></div>
+          <div><label>Y</label><input id="propY" type="number" step="1" /></div>
+          <div><label>W</label><input id="propW" type="number" step="1" /></div>
+          <div><label>H</label><input id="propH" type="number" step="1" /></div>
+        </div>
+        <div class="grid2" style="margin-top: 10px">
+          <div><label>Z</label><input id="propZ" type="number" step="1" /></div>
+          <div>
+            <label>锁定</label>
+            <select id="propLocked">
+              <option value="0">否</option>
+              <option value="1">是</option>
+            </select>
+          </div>
+        </div>
+        <label style="margin-top: 10px">文字内容 / 备注</label>
+        <input id="propText" type="text" />
+        <label style="margin-top: 10px">图片路径 / 临时素材 URL</label>
+        <input id="propSrc" type="text" />
+      </div>
+
+      <div class="section">
+        <h2>导入 / 导出布局 JSON</h2>
+        <div class="grid2">
+          <button id="copyJson" type="button">复制 JSON</button>
+          <button id="applyJson" class="secondary" type="button">应用 JSON</button>
+        </div>
+        <textarea id="layoutJson" spellcheck="false"></textarea>
+        <p class="hint">你可以直接手调 JSON，也可以拖动后复制 JSON 发给我，我按参数接入 React/Tailwind。</p>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    const ASSET_BASE = '../public/assets';
+
+    const scenes = {
+      gamePortrait: {
+        label: '主游戏界面 · 手机竖屏 9:20',
+        width: 720,
+        height: 1600,
+        background: `${ASSET_BASE}/backgrounds/latent-space-portrait.webp`,
+        elements: [
+          { id: 'hud-left', type: 'panel', name: '左上积分 HUD', x: 28, y: 26, w: 224, h: 142, z: 10, text: '培养积分 / 目标' },
+          { id: 'hud-right', type: 'panel', name: '右上时间 HUD', x: 468, y: 26, w: 224, h: 142, z: 10, text: '时间 / 阶段 / 退出' },
+          { id: 'miner', type: 'image', name: '博士小人', x: 281, y: 138, w: 158, h: 210, z: 15, src: `${ASSET_BASE}/sprites/characters/miner-state-normal.webp` },
+          { id: 'bubble', type: 'text', name: '碎碎念浮窗', x: 250, y: 210, w: 220, h: 66, z: 18, text: '碎碎念区域' },
+          { id: 'play-area', type: 'panel', name: '资源玩法区', x: 28, y: 408, w: 664, h: 820, z: 1, text: '资源散布与钩爪活动区域' },
+          { id: 'rope', type: 'image', name: '钩绳动态参考', x: 344, y: 318, w: 32, h: 360, z: 11, src: `${ASSET_BASE}/sprites/hook/rope-segmented.webp` },
+          { id: 'hook', type: 'image', name: '钩爪动态参考', x: 326, y: 652, w: 68, h: 86, z: 12, src: `${ASSET_BASE}/sprites/hook/hook-open.webp` },
+          { id: 'item-data-point', type: 'image', name: '资源：数据点', x: 96, y: 510, w: 82, h: 82, z: 6, src: `${ASSET_BASE}/sprites/items/data-point.webp` },
+          { id: 'item-dataset', type: 'image', name: '资源：数据集', x: 260, y: 626, w: 108, h: 108, z: 6, src: `${ASSET_BASE}/sprites/items/dataset.webp` },
+          { id: 'item-corpus', type: 'image', name: '资源：语料库', x: 494, y: 560, w: 118, h: 118, z: 6, src: `${ASSET_BASE}/sprites/items/corpus.webp` },
+          { id: 'item-rock', type: 'image', name: '障碍：石头', x: 124, y: 794, w: 116, h: 94, z: 6, src: `${ASSET_BASE}/sprites/items/rock.webp` },
+          { id: 'item-diamond', type: 'image', name: '高价值：钻石', x: 430, y: 836, w: 92, h: 92, z: 6, src: `${ASSET_BASE}/sprites/items/diamond.webp` },
+          { id: 'item-bag', type: 'image', name: '随机袋', x: 280, y: 984, w: 102, h: 102, z: 6, src: `${ASSET_BASE}/sprites/items/bag.webp` },
+          { id: 'buff-bar', type: 'image', name: '底部补给栏', x: 24, y: 1252, w: 672, h: 124, z: 20, src: `${ASSET_BASE}/ui/mobile/buff-action-bar-empty.webp` },
+          { id: 'shredder-btn', type: 'image', name: '稿件回收按钮', x: 48, y: 1408, w: 246, h: 88, z: 21, src: `${ASSET_BASE}/ui/mobile/shredder-normal.webp` },
+          { id: 'fire-btn', type: 'image', name: '放钩子按钮', x: 332, y: 1408, w: 318, h: 88, z: 21, src: `${ASSET_BASE}/ui/mobile/fire-normal.webp` },
+        ],
+      },
+      shopPortrait: {
+        label: '学院补给站 · 手机竖屏',
+        width: 720,
+        height: 1600,
+        background: `${ASSET_BASE}/backgrounds/latent-space-portrait.webp`,
+        elements: [
+          { id: 'shop-top', type: 'panel', name: '顶部标题/积分/下一关', x: 36, y: 24, w: 648, h: 86, z: 10, text: 'AI博士补给站 / 积分 / 下一关' },
+          { id: 'shop-tip', type: 'text', name: '操作提示条', x: 52, y: 132, w: 616, h: 72, z: 10, text: '提示文案' },
+          { id: 'goods-area', type: 'panel', name: '商品货架区域', x: 36, y: 230, w: 648, h: 820, z: 1, text: '商品网格容器' },
+          { id: 'card-1', type: 'image', name: '商品卡 1', x: 92, y: 278, w: 154, h: 274, z: 5, src: `${ASSET_BASE}/ui/shop/card-frame-1.webp` },
+          { id: 'card-2', type: 'image', name: '商品卡 2', x: 288, y: 278, w: 154, h: 274, z: 5, src: `${ASSET_BASE}/ui/shop/card-frame-2.webp` },
+          { id: 'card-3', type: 'image', name: '商品卡 3', x: 484, y: 278, w: 154, h: 274, z: 5, src: `${ASSET_BASE}/ui/shop/card-frame-3.webp` },
+          { id: 'card-4', type: 'image', name: '商品卡 4', x: 92, y: 586, w: 154, h: 274, z: 5, src: `${ASSET_BASE}/ui/shop/card-frame-4.webp` },
+          { id: 'card-5', type: 'image', name: '商品卡 5', x: 288, y: 586, w: 154, h: 274, z: 5, src: `${ASSET_BASE}/ui/shop/card-frame-5.webp` },
+          { id: 'advisor', type: 'image', name: '机器人顾问', x: 32, y: 1080, w: 150, h: 150, z: 10, src: `${ASSET_BASE}/ui/modals/robot-mentor.webp` },
+          { id: 'advisor-bubble', type: 'image', name: '顾问气泡', x: 176, y: 1086, w: 492, h: 112, z: 9, src: `${ASSET_BASE}/ui/shop/advisor-bubble-small.webp` },
+          { id: 'detail-panel', type: 'panel', name: '商品说明/购买区', x: 36, y: 1240, w: 648, h: 260, z: 8, text: '商品标题 / 描述 / 价格 / 购买按钮' },
+          { id: 'bottom-nav', type: 'image', name: '底部导航参考', x: 24, y: 1518, w: 672, h: 66, z: 12, src: `${ASSET_BASE}/ui/shop/bottom-nav.webp` },
+        ],
+      },
+      levelComplete: {
+        label: '通关弹窗 · 叠层布局',
+        width: 800,
+        height: 600,
+        background: `${ASSET_BASE}/backgrounds/latent-space-portrait.webp`,
+        elements: [
+          { id: 'success-panel', type: 'image', name: '通关主弹窗框', x: 80, y: 72, w: 640, h: 380, z: 2, src: `${ASSET_BASE}/ui/modals/success-panel.webp` },
+          { id: 'trophy', type: 'image', name: '奖杯', x: 330, y: 55, w: 140, h: 110, z: 5, src: `${ASSET_BASE}/ui/modals/trophy.webp` },
+          { id: 'title', type: 'text', name: '标题', x: 210, y: 180, w: 380, h: 54, z: 6, text: '本阶段培养达标！' },
+          { id: 'desc', type: 'text', name: '说明文字', x: 170, y: 244, w: 460, h: 70, z: 6, text: '导师组对你的进展很满意。' },
+          { id: 'button-primary', type: 'button', name: '主按钮', x: 150, y: 342, w: 500, h: 64, z: 6, text: '前往学院补给站' },
+          { id: 'button-secondary', type: 'button', name: '次按钮', x: 150, y: 418, w: 500, h: 56, z: 6, text: '不进补给站，直接进入下阶段' },
+        ],
+      },
+      gameOver: {
+        label: '失败弹窗 · 叠层布局',
+        width: 800,
+        height: 600,
+        background: `${ASSET_BASE}/backgrounds/latent-space-portrait.webp`,
+        elements: [
+          { id: 'fail-panel', type: 'image', name: '失败主弹窗框', x: 48, y: 58, w: 704, h: 444, z: 2, src: `${ASSET_BASE}/ui/modals/fail-panel.webp` },
+          { id: 'warning', type: 'image', name: '警告图标', x: 350, y: 88, w: 100, h: 86, z: 6, src: `${ASSET_BASE}/ui/modals/fail-warning-icon.webp` },
+          { id: 'title', type: 'text', name: '标题', x: 170, y: 184, w: 460, h: 60, z: 7, text: '本阶段未达培养线' },
+          { id: 'score', type: 'text', name: '分数区', x: 230, y: 292, w: 340, h: 96, z: 7, text: '4296' },
+          { id: 'retry', type: 'image', name: '重试按钮底图', x: 245, y: 415, w: 310, h: 74, z: 6, src: `${ASSET_BASE}/ui/modals/fail-button-normal.webp` },
+        ],
+      },
+    };
+
+    const modules = [
+      { label: '普通面板', type: 'panel', w: 240, h: 120, text: '面板' },
+      { label: '文字块', type: 'text', w: 220, h: 64, text: '文字' },
+      { label: '按钮', type: 'button', w: 220, h: 64, text: '按钮' },
+      { label: '商品卡 · 可购买', type: 'image', w: 154, h: 274, src: `${ASSET_BASE}/ui/shop/card-frame-1.webp` },
+      { label: '商品卡 · 选中', type: 'image', w: 154, h: 274, src: `${ASSET_BASE}/ui/shop/card-frame-2.webp` },
+      { label: '商品卡 · 已购', type: 'image', w: 154, h: 274, src: `${ASSET_BASE}/ui/shop/card-frame-3.webp` },
+      { label: '底部补给栏', type: 'image', w: 672, h: 124, src: `${ASSET_BASE}/ui/mobile/buff-action-bar-empty.webp` },
+      { label: '放钩子按钮', type: 'image', w: 318, h: 88, src: `${ASSET_BASE}/ui/mobile/fire-normal.webp` },
+      { label: '稿件回收按钮', type: 'image', w: 246, h: 88, src: `${ASSET_BASE}/ui/mobile/shredder-normal.webp` },
+      { label: '钩爪', type: 'image', w: 68, h: 86, src: `${ASSET_BASE}/sprites/hook/hook-open.webp` },
+      { label: '钩绳', type: 'image', w: 32, h: 360, src: `${ASSET_BASE}/sprites/hook/rope-segmented.webp` },
+      { label: '资源 · 数据点', type: 'image', w: 82, h: 82, src: `${ASSET_BASE}/sprites/items/data-point.webp` },
+      { label: '资源 · 数据集', type: 'image', w: 108, h: 108, src: `${ASSET_BASE}/sprites/items/dataset.webp` },
+      { label: '资源 · 语料库', type: 'image', w: 118, h: 118, src: `${ASSET_BASE}/sprites/items/corpus.webp` },
+      { label: '资源 · 钻石', type: 'image', w: 92, h: 92, src: `${ASSET_BASE}/sprites/items/diamond.webp` },
+      { label: '机器人导师', type: 'image', w: 150, h: 150, src: `${ASSET_BASE}/ui/modals/robot-mentor.webp` },
+      { label: '通关弹窗框', type: 'image', w: 640, h: 380, src: `${ASSET_BASE}/ui/modals/success-panel.webp` },
+      { label: '失败弹窗框', type: 'image', w: 704, h: 444, src: `${ASSET_BASE}/ui/modals/fail-panel.webp` },
+    ];
+
+    const els = {
+      app: document.getElementById('app'),
+      sceneSelect: document.getElementById('sceneSelect'),
+      moduleList: document.getElementById('moduleList'),
+      layerList: document.getElementById('layerList'),
+      assetFiles: document.getElementById('assetFiles'),
+      assetPath: document.getElementById('assetPath'),
+      assetLibrary: document.getElementById('assetLibrary'),
+      stage: document.getElementById('stage'),
+      stageWrap: document.getElementById('stageWrap'),
+      zoomSelect: document.getElementById('zoomSelect'),
+      gridSelect: document.getElementById('gridSelect'),
+      snapToggle: document.getElementById('snapToggle'),
+      stageInfo: document.getElementById('stageInfo'),
+      json: document.getElementById('layoutJson'),
+      propName: document.getElementById('propName'),
+      propX: document.getElementById('propX'),
+      propY: document.getElementById('propY'),
+      propW: document.getElementById('propW'),
+      propH: document.getElementById('propH'),
+      propZ: document.getElementById('propZ'),
+      propLocked: document.getElementById('propLocked'),
+      propText: document.getElementById('propText'),
+      propSrc: document.getElementById('propSrc'),
+    };
+
+    let state = {
+      sceneKey: 'gamePortrait',
+      width: scenes.gamePortrait.width,
+      height: scenes.gamePortrait.height,
+      background: scenes.gamePortrait.background,
+      zoom: Number(els.zoomSelect.value),
+      grid: Number(els.gridSelect.value),
+      snap: true,
+      cacheVersion: Date.now(),
+      selectedId: null,
+      customAssets: [],
+      elements: clone(scenes.gamePortrait.elements),
+      drag: null,
+    };
+
+    function clone(obj) {
+      return JSON.parse(JSON.stringify(obj));
+    }
+
+    function uid(prefix = 'el') {
+      return `${prefix}-${Math.random().toString(36).slice(2, 8)}`;
+    }
+
+    function selected() {
+      return state.elements.find((e) => e.id === state.selectedId) || null;
+    }
+
+    function snap(n) {
+      return state.snap && state.grid > 0 ? Math.round(n / state.grid) * state.grid : Math.round(n);
+    }
+
+    function clamp(n, lo, hi) {
+      return Math.max(lo, Math.min(hi, n));
+    }
+
+    function assetUrl(src) {
+      if (!src || src.startsWith('blob:') || src.startsWith('data:')) return src;
+      const joiner = src.includes('?') ? '&' : '?';
+      return `${src}${joiner}layoutCache=${state.cacheVersion}`;
+    }
+
+    function init() {
+      for (const [key, scene] of Object.entries(scenes)) {
+        const opt = document.createElement('option');
+        opt.value = key;
+        opt.textContent = scene.label;
+        els.sceneSelect.appendChild(opt);
+      }
+
+      renderModuleList();
+
+      bindEvents();
+      render();
+    }
+
+    function renderModuleList() {
+      els.moduleList.innerHTML = '';
+      modules.forEach((m) => {
+        const btn = document.createElement('button');
+        btn.className = 'module-btn';
+        btn.type = 'button';
+        btn.innerHTML = `<span>${m.label}</span><small>${m.type}</small>`;
+        btn.addEventListener('click', () => addModule(m));
+        els.moduleList.appendChild(btn);
+      });
+    }
+
+    function bindEvents() {
+      els.sceneSelect.addEventListener('change', () => loadScene(els.sceneSelect.value));
+      els.zoomSelect.addEventListener('change', () => {
+        state.zoom = Number(els.zoomSelect.value);
+        renderStageFrame();
+      });
+      els.gridSelect.addEventListener('change', () => {
+        state.grid = Number(els.gridSelect.value);
+        renderStageFrame();
+      });
+      els.snapToggle.addEventListener('click', () => {
+        state.snap = !state.snap;
+        els.snapToggle.textContent = `吸附：${state.snap ? '开' : '关'}`;
+      });
+      document.getElementById('resetScene').addEventListener('click', () => loadScene(state.sceneKey));
+      document.getElementById('duplicateEl').addEventListener('click', duplicateSelected);
+      document.getElementById('deleteEl').addEventListener('click', deleteSelected);
+      document.getElementById('frontEl').addEventListener('click', () => moveZ(1));
+      document.getElementById('backEl').addEventListener('click', () => moveZ(-1));
+      document.getElementById('copyJson').addEventListener('click', copyJson);
+      document.getElementById('applyJson').addEventListener('click', applyJson);
+      document.getElementById('exportPng').addEventListener('click', exportPreview);
+      document.getElementById('addPathAsset').addEventListener('click', addPathAsset);
+      document.getElementById('clearAssets').addEventListener('click', clearAssets);
+      document.getElementById('refreshImages').addEventListener('click', refreshImages);
+      document.getElementById('toggleLeft').addEventListener('click', toggleLeftPanel);
+      document.getElementById('toggleRight').addEventListener('click', toggleRightPanel);
+      els.assetFiles.addEventListener('change', importAssetFiles);
+
+      for (const id of ['propName', 'propX', 'propY', 'propW', 'propH', 'propZ', 'propLocked', 'propText', 'propSrc']) {
+        els[id].addEventListener('input', applyProps);
+        els[id].addEventListener('change', applyProps);
+      }
+
+      document.addEventListener('keydown', (e) => {
+        const el = selected();
+        if (!el) return;
+        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+        const step = e.shiftKey ? 10 : 1;
+        let used = true;
+        if (e.key === 'ArrowLeft') el.x -= step;
+        else if (e.key === 'ArrowRight') el.x += step;
+        else if (e.key === 'ArrowUp') el.y -= step;
+        else if (e.key === 'ArrowDown') el.y += step;
+        else if (e.key === 'Delete' || e.key === 'Backspace') deleteSelected();
+        else used = false;
+        if (used) {
+          e.preventDefault();
+          constrainElement(el);
+          render();
+        }
+      });
+    }
+
+    function loadScene(key) {
+      const scene = scenes[key];
+      state.sceneKey = key;
+      state.width = scene.width;
+      state.height = scene.height;
+      state.background = scene.background;
+      state.elements = clone(scene.elements);
+      state.selectedId = state.elements[0]?.id || null;
+      render();
+    }
+
+    function addModule(m) {
+      const el = {
+        id: uid(m.type),
+        type: m.type,
+        name: m.label,
+        x: snap(state.width / 2 - m.w / 2),
+        y: snap(state.height / 2 - m.h / 2),
+        w: m.w,
+        h: m.h,
+        z: Math.max(0, ...state.elements.map((e) => e.z || 0)) + 1,
+        text: m.text || m.label,
+        src: m.src,
+      };
+      state.elements.push(el);
+      state.selectedId = el.id;
+      render();
+    }
+
+    function addImageModuleFromAsset(asset) {
+      addModule({
+        label: asset.label,
+        type: 'image',
+        w: asset.w || 160,
+        h: asset.h || 120,
+        src: asset.src,
+      });
+    }
+
+    function renderAssetLibrary() {
+      els.assetLibrary.innerHTML = '';
+      if (!state.customAssets.length) {
+        const empty = document.createElement('div');
+        empty.className = 'hint';
+        empty.style.gridColumn = '1 / -1';
+        empty.textContent = '暂无临时素材。可从切图工具导出 PNG 后在这里多选导入，或注册相对路径。';
+        els.assetLibrary.appendChild(empty);
+        return;
+      }
+
+      state.customAssets.forEach((asset) => {
+        const btn = document.createElement('button');
+        btn.className = 'asset-card';
+        btn.type = 'button';
+        btn.title = asset.src;
+        btn.innerHTML = `<img src="${assetUrl(asset.src)}" alt=""><span>${asset.label}</span>`;
+        btn.addEventListener('click', () => addImageModuleFromAsset(asset));
+        els.assetLibrary.appendChild(btn);
+      });
+    }
+
+    function render() {
+      renderStageFrame();
+      renderElements();
+      renderLayers();
+      renderProps();
+      renderAssetLibrary();
+      renderJson();
+    }
+
+    function renderStageFrame() {
+      els.sceneSelect.value = state.sceneKey;
+      els.zoomSelect.value = String(state.zoom);
+      els.gridSelect.value = String(state.grid);
+      els.stageInfo.textContent = `${state.width}×${state.height}`;
+      els.stage.style.width = `${state.width}px`;
+      els.stage.style.height = `${state.height}px`;
+      els.stage.style.transform = `scale(${state.zoom})`;
+      els.stage.style.marginBottom = `${Math.max(28, state.height * (state.zoom - 1) + 28)}px`;
+      els.stage.classList.toggle('hide-grid', state.grid <= 0);
+      els.stage.style.setProperty('--grid-size', `${state.grid || 40}px`);
+      els.stage.style.backgroundImage = `linear-gradient(rgba(2,6,23,0.22), rgba(2,6,23,0.22)), url(${assetUrl(state.background)})`;
+      els.stage.style.backgroundSize = 'cover';
+      els.stage.style.backgroundPosition = 'center';
+    }
+
+    function renderElements() {
+      els.stage.innerHTML = '';
+      [...state.elements]
+        .sort((a, b) => (a.z || 0) - (b.z || 0))
+        .forEach((el) => {
+          const node = document.createElement('div');
+          node.className = `element ${el.type || 'panel'} ${el.id === state.selectedId ? 'selected' : ''} ${el.locked ? 'locked' : ''}`;
+          node.dataset.id = el.id;
+          node.style.left = `${el.x}px`;
+          node.style.top = `${el.y}px`;
+          node.style.width = `${el.w}px`;
+          node.style.height = `${el.h}px`;
+          node.style.zIndex = String(el.z || 0);
+          if (el.opacity != null) node.style.opacity = el.opacity;
+
+          const label = document.createElement('div');
+          label.className = 'label';
+          label.textContent = el.name;
+          node.appendChild(label);
+
+          if (el.type === 'image' && el.src) {
+            const img = document.createElement('img');
+            img.src = assetUrl(el.src);
+            img.alt = '';
+            node.appendChild(img);
+          } else if (el.type === 'text' || el.type === 'button' || el.type === 'panel') {
+            node.appendChild(document.createTextNode(el.text || el.name));
+          }
+
+          const handle = document.createElement('div');
+          handle.className = 'handle';
+          handle.dataset.resize = '1';
+          node.appendChild(handle);
+
+          node.addEventListener('pointerdown', onElementPointerDown);
+          els.stage.appendChild(node);
+        });
+    }
+
+    function renderLayers() {
+      els.layerList.innerHTML = '';
+      [...state.elements]
+        .sort((a, b) => (b.z || 0) - (a.z || 0))
+        .forEach((el) => {
+          const item = document.createElement('div');
+          item.className = `layer-item ${el.id === state.selectedId ? 'selected' : ''}`;
+          item.innerHTML = `<div><div class="name">${el.name}</div><div class="meta">${el.type} · x${Math.round(el.x)} y${Math.round(el.y)} · z${el.z || 0}</div></div><div>${el.locked ? '锁' : ''}</div>`;
+          item.addEventListener('click', () => {
+            state.selectedId = el.id;
+            render();
+          });
+          els.layerList.appendChild(item);
+        });
+    }
+
+    function renderSelectionOnly() {
+      document.querySelectorAll('.element').forEach((node) => {
+        node.classList.toggle('selected', node.dataset.id === state.selectedId);
+      });
+      renderLayers();
+      renderProps();
+      renderJson();
+    }
+
+    function renderProps() {
+      const el = selected();
+      const disabled = !el;
+      for (const input of [els.propName, els.propX, els.propY, els.propW, els.propH, els.propZ, els.propLocked, els.propText, els.propSrc]) {
+        input.disabled = disabled;
+      }
+      if (!el) {
+        els.propName.value = '';
+        els.propX.value = '';
+        els.propY.value = '';
+        els.propW.value = '';
+        els.propH.value = '';
+        els.propZ.value = '';
+        els.propText.value = '';
+        els.propSrc.value = '';
+        els.propLocked.value = '0';
+        return;
+      }
+      els.propName.value = el.name || '';
+      els.propX.value = Math.round(el.x);
+      els.propY.value = Math.round(el.y);
+      els.propW.value = Math.round(el.w);
+      els.propH.value = Math.round(el.h);
+      els.propZ.value = el.z || 0;
+      els.propLocked.value = el.locked ? '1' : '0';
+      els.propText.value = el.text || '';
+      els.propSrc.value = el.src || '';
+    }
+
+    function renderJson() {
+      els.json.value = JSON.stringify({
+        scene: state.sceneKey,
+        width: state.width,
+        height: state.height,
+        background: state.background,
+        customAssets: state.customAssets
+          .filter((asset) => !asset.temporary)
+          .map(({ label, src, w, h }) => ({ label, src, w, h })),
+        elements: state.elements.map(({ id, type, name, x, y, w, h, z, text, src, locked }) => ({
+          id, type, name,
+          x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h),
+          z: z || 0,
+          text: text || undefined,
+          src: src || undefined,
+          locked: locked || undefined,
+        })),
+      }, null, 2);
+    }
+
+    function applyProps() {
+      const el = selected();
+      if (!el) return;
+      el.name = els.propName.value || el.name;
+      el.x = Number(els.propX.value) || 0;
+      el.y = Number(els.propY.value) || 0;
+      el.w = Math.max(1, Number(els.propW.value) || 1);
+      el.h = Math.max(1, Number(els.propH.value) || 1);
+      el.z = Number(els.propZ.value) || 0;
+      el.locked = els.propLocked.value === '1';
+      el.text = els.propText.value;
+      el.src = els.propSrc.value || undefined;
+      if (el.src && el.type !== 'image') el.type = 'image';
+      constrainElement(el);
+      renderElements();
+      renderLayers();
+      renderJson();
+    }
+
+    function importAssetFiles() {
+      const files = Array.from(els.assetFiles.files || []);
+      if (!files.length) return;
+      files.forEach((file) => {
+        if (!file.type.startsWith('image/')) return;
+        const src = URL.createObjectURL(file);
+        const img = new Image();
+        const asset = {
+          label: file.name,
+          src,
+          w: 160,
+          h: 120,
+          temporary: true,
+        };
+        img.onload = () => {
+          const maxSide = 220;
+          const scale = Math.min(1, maxSide / img.naturalWidth, maxSide / img.naturalHeight);
+          asset.w = Math.max(24, Math.round(img.naturalWidth * scale));
+          asset.h = Math.max(24, Math.round(img.naturalHeight * scale));
+          renderAssetLibrary();
+        };
+        img.src = src;
+        state.customAssets.push(asset);
+      });
+      els.assetFiles.value = '';
+      renderAssetLibrary();
+    }
+
+    function addPathAsset() {
+      const src = els.assetPath.value.trim();
+      if (!src) return;
+      const label = src.split(/[\\/]/).pop() || 'path-asset.png';
+      const asset = { label, src, w: 160, h: 120 };
+      const img = new Image();
+      img.onload = () => {
+        const maxSide = 220;
+        const scale = Math.min(1, maxSide / img.naturalWidth, maxSide / img.naturalHeight);
+        asset.w = Math.max(24, Math.round(img.naturalWidth * scale));
+        asset.h = Math.max(24, Math.round(img.naturalHeight * scale));
+        renderAssetLibrary();
+      };
+      img.src = src;
+      state.customAssets.push(asset);
+      renderAssetLibrary();
+    }
+
+    function clearAssets() {
+      state.customAssets.forEach((asset) => {
+        if (asset.temporary && asset.src.startsWith('blob:')) URL.revokeObjectURL(asset.src);
+      });
+      state.customAssets = [];
+      renderAssetLibrary();
+    }
+
+    function refreshImages() {
+      state.cacheVersion = Date.now();
+      renderStageFrame();
+      renderElements();
+      renderAssetLibrary();
+    }
+
+    function toggleLeftPanel() {
+      els.app.classList.toggle('hide-left');
+      document.getElementById('toggleLeft').textContent = els.app.classList.contains('hide-left') ? '显示左栏' : '隐藏左栏';
+    }
+
+    function toggleRightPanel() {
+      els.app.classList.toggle('hide-right');
+      document.getElementById('toggleRight').textContent = els.app.classList.contains('hide-right') ? '显示右栏' : '隐藏右栏';
+    }
+
+    function onElementPointerDown(e) {
+      const id = e.currentTarget.dataset.id;
+      const el = state.elements.find((x) => x.id === id);
+      if (!el) return;
+      state.selectedId = id;
+      renderSelectionOnly();
+      if (el.locked) return;
+      const isResize = e.target.dataset.resize === '1';
+      e.currentTarget.setPointerCapture(e.pointerId);
+      state.drag = {
+        id,
+        mode: isResize ? 'resize' : 'move',
+        startX: e.clientX,
+        startY: e.clientY,
+        original: { ...el },
+      };
+      e.preventDefault();
+    }
+
+    document.addEventListener('pointermove', (e) => {
+      if (!state.drag) return;
+      const el = state.elements.find((x) => x.id === state.drag.id);
+      if (!el) return;
+      const dx = (e.clientX - state.drag.startX) / state.zoom;
+      const dy = (e.clientY - state.drag.startY) / state.zoom;
+      if (state.drag.mode === 'move') {
+        el.x = snap(state.drag.original.x + dx);
+        el.y = snap(state.drag.original.y + dy);
+      } else {
+        el.w = Math.max(8, snap(state.drag.original.w + dx));
+        el.h = Math.max(8, snap(state.drag.original.h + dy));
+      }
+      constrainElement(el);
+      renderElements();
+      renderLayers();
+      renderProps();
+      renderJson();
+    });
+
+    document.addEventListener('pointerup', () => {
+      state.drag = null;
+    });
+
+    function constrainElement(el) {
+      el.w = clamp(el.w, 1, state.width);
+      el.h = clamp(el.h, 1, state.height);
+      el.x = clamp(el.x, 0, state.width - el.w);
+      el.y = clamp(el.y, 0, state.height - el.h);
+    }
+
+    function duplicateSelected() {
+      const el = selected();
+      if (!el) return;
+      const copy = clone(el);
+      copy.id = uid(el.type);
+      copy.name = `${el.name} 副本`;
+      copy.x = clamp(el.x + 24, 0, state.width - el.w);
+      copy.y = clamp(el.y + 24, 0, state.height - el.h);
+      copy.z = (Math.max(0, ...state.elements.map((e) => e.z || 0)) + 1);
+      state.elements.push(copy);
+      state.selectedId = copy.id;
+      render();
+    }
+
+    function deleteSelected() {
+      if (!state.selectedId) return;
+      state.elements = state.elements.filter((e) => e.id !== state.selectedId);
+      state.selectedId = state.elements[0]?.id || null;
+      render();
+    }
+
+    function moveZ(dir) {
+      const el = selected();
+      if (!el) return;
+      if (dir > 0) el.z = Math.max(0, ...state.elements.map((e) => e.z || 0)) + 1;
+      else el.z = Math.min(0, ...state.elements.map((e) => e.z || 0)) - 1;
+      render();
+    }
+
+    async function copyJson() {
+      renderJson();
+      await navigator.clipboard.writeText(els.json.value);
+      alert('布局 JSON 已复制');
+    }
+
+    function applyJson() {
+      try {
+        const data = JSON.parse(els.json.value);
+        state.sceneKey = data.scene || state.sceneKey;
+        state.width = data.width || state.width;
+        state.height = data.height || state.height;
+        state.background = data.background || state.background;
+        if (Array.isArray(data.customAssets)) {
+          state.customAssets = data.customAssets.map((asset) => ({
+            label: asset.label || asset.name || asset.src || 'asset.png',
+            src: asset.src,
+            w: asset.w || 160,
+            h: asset.h || 120,
+          })).filter((asset) => asset.src);
+        } else if (data.layoutAsset && data.layoutAsset.src) {
+          const asset = data.layoutAsset;
+          state.customAssets.push({
+            label: asset.label || asset.name || asset.src.split(/[\\/]/).pop(),
+            src: asset.src,
+            w: asset.w || 160,
+            h: asset.h || 120,
+          });
+        }
+        state.elements = Array.isArray(data.elements) ? data.elements : state.elements;
+        state.selectedId = state.elements[0]?.id || null;
+        render();
+      } catch (e) {
+        alert('JSON 解析失败：' + e.message);
+      }
+    }
+
+    function exportPreview() {
+      // 这个导出用于快速截图确认布局，不追求完全等同浏览器 CSS 渲染。
+      const canvas = document.createElement('canvas');
+      canvas.width = state.width;
+      canvas.height = state.height;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#020617';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = 'rgba(56,189,248,0.12)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#e0f2fe';
+      ctx.font = 'bold 24px sans-serif';
+      ctx.fillText('布局预览导出：请以浏览器画面为准', 24, 42);
+      ctx.font = '16px sans-serif';
+      state.elements.forEach((el) => {
+        ctx.strokeStyle = el.id === state.selectedId ? '#f97316' : '#38bdf8';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(el.x, el.y, el.w, el.h);
+        ctx.fillStyle = 'rgba(2,6,23,0.55)';
+        ctx.fillRect(el.x, el.y, el.w, Math.min(28, el.h));
+        ctx.fillStyle = '#e0f2fe';
+        ctx.fillText(el.name, el.x + 6, el.y + 20);
+      });
+      canvas.toBlob((blob) => {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `${state.sceneKey}-layout-preview.png`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      });
+    }
+
+    init();
+  </script>
+</body>
+</html>
